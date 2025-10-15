@@ -1,5 +1,5 @@
 {
-  "frame": {
+  "miniapp": {
     "name": "Weather",
     "version": "1",
     "iconUrl": "https://weather-base-app.vercel.app/icon.png",
@@ -17,12 +17,12 @@
     ],
     "ogTitle": "Weather • Farcaster MiniApp"
   },
+  "baseBuilder": {
+    "ownerAddress": "0xA5f2c343813B6fb6fE947C2C4759F2c421a346a7"
+  },
   "accountAssociation": {
     "header": "eyJmaWQiOjYxMjA2NiwidHlwZSI6ImF1dGgiLCJrZXkiOiIweDE4MjhjNEJmNzhEQWI2NkI0QjdkZUJmYUEzOEYwQWQxMjVFYzhkMTUifQ",
     "payload": "eyJkb21haW4iOiJ3ZWF0aGVyLWJhc2UtYXBwLnZlcmNlbC5hcHAifQ",
     "signature": "SGwaEu9G2OpEIEOIhmPCRxvXzR89VJh2pa2tZujwgPICLkkU3CG0uSVGbj4NFZnpRhRfJAUT5tn+xicHTV/dGxs="
-  },
-  "baseBuilder": {
-    "ownerAddress": "0xA5f2c343813B6fb6fE947C2C4759F2c421a346a7"
   }
 }
