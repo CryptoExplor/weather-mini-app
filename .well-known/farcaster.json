@@ -1,1 +1,28 @@
-
+{
+  "frame": {
+    "name": "Weather",
+    "version": "1",
+    "iconUrl": "https://weather-base-app.vercel.app/icon.png",
+    "homeUrl": "https://weather-base-app.vercel.app",
+    "imageUrl": "https://weather-base-app.vercel.app/image.png",
+    "buttonTitle": "Weather",
+    "splashImageUrl": "https://weather-base-app.vercel.app/splash.png",
+    "splashBackgroundColor": "#111111",
+    "webhookUrl": "https://weather-base-app.vercel.app/api/webhook",
+    "subtitle": "Weather Farcaster MiniApp",
+    "description": "Get live weather, daily forecasts, adaptive greetings, and morning notifications right inside Farcaster.",
+    "primaryCategory": "utility",
+    "tags": [
+      "weather"
+    ],
+    "ogTitle": "Weather • Farcaster MiniApp"
+  },
+  "accountAssociation": {
+    "header": "eyJmaWQiOjYxMjA2NiwidHlwZSI6ImF1dGgiLCJrZXkiOiIweDE4MjhjNEJmNzhEQWI2NkI0QjdkZUJmYUEzOEYwQWQxMjVFYzhkMTUifQ",
+    "payload": "eyJkb21haW4iOiJ3ZWF0aGVyLWJhc2UtYXBwLnZlcmNlbC5hcHAifQ",
+    "signature": "SGwaEu9G2OpEIEOIhmPCRxvXzR89VJh2pa2tZujwgPICLkkU3CG0uSVGbj4NFZnpRhRfJAUT5tn+xicHTV/dGxs="
+  },
+  "baseBuilder": {
+    "allowedAddresses": ["0xA5f2c343813B6fb6fE947C2C4759F2c421a346a7"]
+  }
+}
