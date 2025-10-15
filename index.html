@@ -6,7 +6,7 @@
   <title>Weather • Farcaster MiniApp</title>
   <meta name="theme-color" content="#9d4df1" />
   <link rel="icon" href="data:image/svg+xml,%F0%9F%8C%A4" />
-  <meta name="description" content="Get live weather, daily forecasts, and morning greetings right inside Farcaster." />
+  <meta name="description" content="Get live weather, daily forecasts, and adaptive greetings right inside Farcaster." />
   <style>
     :root{
       --purple:#9d4df1;
@@ -14,59 +14,55 @@
       --glass-bd:rgba(255,255,255,0.15);
       --text:#f6f6f7;
       --muted:#cfd2d9;
-      --ok:#10b981;
-      --warn:#f59e0b;
-      --bad:#ef4444;
       --radius:12px;
       --maxw:350px;
     }
-    * { box-sizing:border-box }
-    html, body { height:100% }
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
     body{
       margin:0;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji;
       color:var(--text);
       background: radial-gradient(1200px 800px at 80% -10%, rgba(255,255,255,0.08), transparent 60%) fixed;
       transition: background 400ms ease;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:16px;
+      display:flex; align-items:center; justify-content:center; padding:16px;
     }
     .wrap{ width:100%; max-width:var(--maxw); }
-    .card{ background:var(--glass-bg); border:1px solid var(--glass-bd); backdrop-filter:blur(14px); border-radius:var(--radius); padding:16px; box-shadow:0 10px 30px rgba(0,0,0,0.25);}
-    .header{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px;}
-    .title{ display:flex; align-items:center; gap:8px; font-weight:700; letter-spacing:.2px;}
-    .badge{ padding:2px 8px; border-radius:999px; background:#201235; color:#caa9ff; border:1px solid #3b1a72; font-size:12px;}
-    .search{ display:flex; gap:8px; margin:10px 0 12px;}
-    input[type="text"]{ flex:1; border-radius:10px; border:1px solid #303040; background:#12121a; color:var(--text); padding:10px 12px; outline:none;}
+    .card{ background:var(--glass-bg); border:1px solid var(--glass-bd); backdrop-filter: blur(14px); border-radius:var(--radius); padding:16px; box-shadow:0 10px 30px rgba(0,0,0,0.25); }
+    .header{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+    .title{ display:flex; align-items:center; gap:8px; font-weight:700; letter-spacing:.2px; }
+    .badge{ padding:2px 8px; border-radius:999px; background:#201235; color:#caa9ff; border:1px solid #3b1a72; font-size:12px; }
+    .search{ display:flex; gap:8px; margin:10px 0 12px; }
+    input[type="text"]{ flex:1; border-radius:10px; border:1px solid #303040; background:#12121a; color:var(--text); padding:10px 12px; outline:none; }
     input::placeholder{ color:#8b8fa3 }
-    button{ border:none; background:var(--purple); color:white; border-radius:10px; padding:10px 12px; font-weight:600; cursor:pointer; transition:filter .2s ease, transform .02s;}
-    button:active{ transform:translateY(1px) }
-    .ghost{ background:transparent; border:1px solid #40355e; color:#d9c9ff;}
+    button{ border:none; background:var(--purple); color:white; border-radius:10px; padding:10px 12px; font-weight:600; cursor:pointer; transition: filter .2s ease, transform .02s; }
+    button:active{ transform: translateY(1px) }
+    .ghost{ background:transparent; border:1px solid #40355e; color:#d9c9ff; }
     .row{ display:flex; gap:12px; align-items:stretch; }
     .col{ flex:1 }
     .hero{ display:flex; gap:12px; align-items:center; margin:10px 0 14px; }
-    .temp{ font-size:40px; font-weight:800; letter-spacing:-.5px;}
-    .condition{ font-size:14px; color:var(--muted);}
-    .chip{ display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; border:1px solid var(--glass-bd); background:rgba(255,255,255,0.05); font-size:13px; color:#dfe2ea;}
-    .grid{ display:grid; grid-template-columns: repeat(2, 1fr); gap:8px; margin-top:10px;}
-    .cell{ padding:10px; border-radius:10px; border:1px solid var(--glass-bd); background:rgba(255,255,255,0.04); display:flex; align-items:center; justify-content:space-between; font-size:14px;}
+    .temp{ font-size:40px; font-weight:800; letter-spacing:-.5px; }
+    .condition{ font-size:14px; color:var(--muted); }
+    .chip{ display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; border:1px solid var(--glass-bd); background:rgba(255,255,255,0.05); font-size:13px; color:#dfe2ea; }
+    .grid{ display:grid; grid-template-columns: repeat(2, 1fr); gap:8px; margin-top:10px; }
+    .cell{ padding:10px; border-radius:10px; border:1px solid var(--glass-bd); background:rgba(255,255,255,0.04); display:flex; align-items:center; justify-content:space-between; font-size:14px; }
     .foot{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:12px; }
     .hint{ color:#9aa1b7; font-size:12px }
     .small{ font-size:12px; color:#aab0c5 }
-    .greeting{ margin:12px 0 0; padding:10px 12px; border-radius:10px; background:rgba(157,77,241,0.12); border:1px solid #3b1a72; color:#eadbff; font-size:14px;}
-    .forecast{ display:flex; gap:8px; overflow-x:auto; padding:6px 2px 2px; margin-top:10px;}
-    .fcard{ min-width:72px; border:1px solid var(--glass-bd); background:rgba(255,255,255,0.04); border-radius:10px; padding:8px; text-align:center; font-size:12px;}
+    .greeting{ margin:12px 0 0; padding:10px 12px; border-radius:10px; background:rgba(157,77,241,0.12); border:1px solid #3b1a72; color:#eadbff; font-size:14px; }
+
+    .forecast{ display:flex; gap:8px; overflow-x:auto; padding:6px 2px 2px; margin-top:10px; -ms-overflow-style: none; scrollbar-width: none; }
+    .forecast::-webkit-scrollbar{ display:none; }
+    .fcard{ min-width:72px; border:1px solid var(--glass-bd); background:rgba(255,255,255,0.04); border-radius:10px; padding:8px; text-align:center; font-size:12px; }
     .fday{ color:#cbd2e6; font-weight:600; }
     .ftemp{ font-weight:700; font-size:13px }
+
     .bg-sunny{ background: linear-gradient(160deg, #FFB347 0%, #FF8C42 60%, #6b21a8 120%) fixed; }
     .bg-cloudy{ background: linear-gradient(160deg, #87CEEB 0%, #4682B4 60%, #312e81 120%) fixed; }
     .bg-rainy{ background: linear-gradient(160deg, #1e3a8a 0%, #1e40af 60%, #111827 120%) fixed; }
     .bg-night{ background: linear-gradient(160deg, #2e1065 0%, #581c87 60%, #111827 120%) fixed; }
-    @media (prefers-reduced-motion: reduce){
-      *{ transition: none !important; animation: none !important; }
-    }
+
+    @media (prefers-reduced-motion: reduce){ *{ transition:none !important; animation:none !important; } }
   </style>
 </head>
 <body class="bg-night">
@@ -80,11 +76,13 @@
         </div>
         <button id="btn-cast" class="ghost" title="Cast Weather">🟣 Cast</button>
       </div>
+
       <div class="search" role="search">
         <input id="city" type="text" inputmode="search" placeholder="Search city (e.g., Bangalore)" aria-label="Search city" />
         <button id="btn-search" aria-label="Search weather">Search</button>
         <button id="btn-myloc" class="ghost" title="Back to my location" aria-label="Back to my location">📍</button>
       </div>
+
       <div class="hero" aria-live="polite">
         <div style="font-size:38px" id="emoji">⛅</div>
         <div>
@@ -92,6 +90,7 @@
           <div class="condition" id="cond">Loading...</div>
         </div>
       </div>
+
       <div class="row">
         <div class="col">
           <div class="chip" title="Humidity"><span>💧</span><span id="humid">--%</span></div>
@@ -100,73 +99,110 @@
           <div class="chip" title="Wind speed"><span>🍃</span><span id="wind">-- km/h</span></div>
         </div>
       </div>
+
       <div class="grid" aria-label="Details">
         <div class="cell"><span>Feels like</span><span id="feels">--°C</span></div>
         <div class="cell"><span>Local time</span><span id="ltime">--:--</span></div>
       </div>
+
       <div class="forecast" id="forecast" aria-label="Forecast"></div>
-      <div class="greeting" id="greeting" role="status">Fetching your morning message…</div>
+
+      <div class="greeting" id="greeting" role="status">Fetching your greeting…</div>
+
       <div class="foot">
         <div class="hint" id="status">Detecting location…</div>
-        <div class="small" id="refresh">Auto refresh: 3h</div>
+        <div class="small" id="refresh">Updated • —</div>
       </div>
     </div>
   </div>
-  <script>
+
+  <script defer>
+    // Endpoints
     const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
-    const GEO_CODE = "https://geocoding-api.open-meteo.com/v1/search";
+    const GEO_CODE   = "https://geocoding-api.open-meteo.com/v1/search";
     const DEFAULT_CITY = { name:"Bangalore", latitude:12.9716, longitude:77.5946 };
+
+    // Weather code mapping
     const WMO = {
-      0:{t:"Clear sky",e:"☀️",bg:"sunny"}, 1:{t:"Mainly clear",e:"🌤️",bg:"sunny"}, 2:{t:"Partly cloudy",e:"⛅",bg:"cloudy"}, 3:{t:"Overcast",e:"☁️",bg:"cloudy"}, 45:{t:"Fog",e:"🌫️",bg:"cloudy"},
-      48:{t:"Depositing rime fog",e:"🌫️",bg:"cloudy"}, 51:{t:"Light drizzle",e:"🌦️",bg:"rainy"}, 53:{t:"Moderate drizzle",e:"🌦️",bg:"rainy"}, 55:{t:"Dense drizzle",e:"🌧️",bg:"rainy"}, 
-      56:{t:"Freezing drizzle: light",e:"🌧️",bg:"rainy"}, 57:{t:"Freezing drizzle: dense",e:"🌧️",bg:"rainy"}, 61:{t:"Slight rain",e:"🌧️",bg:"rainy"}, 63:{t:"Moderate rain",e:"🌧️",bg:"rainy"},
-      65:{t:"Heavy rain",e:"🌧️",bg:"rainy"}, 66:{t:"Freezing rain: light",e:"🌧️",bg:"rainy"}, 67:{t:"Freezing rain: heavy",e:"🌧️",bg:"rainy"}, 71:{t:"Slight snow",e:"🌨️",bg:"cloudy"},
-      73:{t:"Moderate snow",e:"❄️",bg:"cloudy"}, 75:{t:"Heavy snow",e:"❄️",bg:"cloudy"}, 77:{t:"Snow grains",e:"🌨️",bg:"cloudy"}, 80:{t:"Rain showers: slight",e:"🌧️",bg:"rainy"},
-      81:{t:"Rain showers: moderate",e:"🌧️",bg:"rainy"}, 82:{t:"Rain showers: violent",e:"🌧️",bg:"rainy"}, 85:{t:"Snow showers: slight",e:"🌨️",bg:"cloudy"}, 86:{t:"Snow showers: heavy",e:"❄️",bg:"cloudy"},
+      0:{t:"Clear sky",e:"☀️",bg:"sunny"}, 1:{t:"Mainly clear",e:"🌤️",bg:"sunny"}, 2:{t:"Partly cloudy",e:"⛅",bg:"cloudy"}, 3:{t:"Overcast",e:"☁️",bg:"cloudy"},
+      45:{t:"Fog",e:"🌫️",bg:"cloudy"}, 48:{t:"Depositing rime fog",e:"🌫️",bg:"cloudy"},
+      51:{t:"Light drizzle",e:"🌦️",bg:"rainy"}, 53:{t:"Moderate drizzle",e:"🌦️",bg:"rainy"}, 55:{t:"Dense drizzle",e:"🌧️",bg:"rainy"},
+      56:{t:"Freezing drizzle: light",e:"🌧️",bg:"rainy"}, 57:{t:"Freezing drizzle: dense",e:"🌧️",bg:"rainy"},
+      61:{t:"Slight rain",e:"🌧️",bg:"rainy"}, 63:{t:"Moderate rain",e:"🌧️",bg:"rainy"}, 65:{t:"Heavy rain",e:"🌧️",bg:"rainy"},
+      66:{t:"Freezing rain: light",e:"🌧️",bg:"rainy"}, 67:{t:"Freezing rain: heavy",e:"🌧️",bg:"rainy"},
+      71:{t:"Slight snow",e:"🌨️",bg:"cloudy"}, 73:{t:"Moderate snow",e:"❄️",bg:"cloudy"}, 75:{t:"Heavy snow",e:"❄️",bg:"cloudy"}, 77:{t:"Snow grains",e:"🌨️",bg:"cloudy"},
+      80:{t:"Rain showers: slight",e:"🌧️",bg:"rainy"}, 81:{t:"Rain showers: moderate",e:"🌧️",bg:"rainy"}, 82:{t:"Rain showers: violent",e:"🌧️",bg:"rainy"},
+      85:{t:"Snow showers: slight",e:"🌨️",bg:"cloudy"}, 86:{t:"Snow showers: heavy",e:"❄️",bg:"cloudy"},
       95:{t:"Thunderstorm",e:"⛈️",bg:"rainy"}, 96:{t:"Thunderstorm with slight hail",e:"⛈️",bg:"rainy"}, 99:{t:"Thunderstorm with heavy hail",e:"⛈️",bg:"rainy"}
     };
+
+    // DOM
     const els = {
-      emoji: document.getElementById("emoji"), temp: document.getElementById("temp"), cond: document.getElementById("cond"),
-      humid: document.getElementById("humid"), wind: document.getElementById("wind"), feels: document.getElementById("feels"), ltime: document.getElementById("ltime"),
-      greeting: document.getElementById("greeting"), status: document.getElementById("status"), refresh: document.getElementById("refresh"), 
-      forecast: document.getElementById("forecast"), city: document.getElementById("city"), btnSearch: document.getElementById("btn-search"),
-      btnCast: document.getElementById("btn-cast"), btnMyLoc: document.getElementById("btn-myloc")
+      emoji: document.getElementById("emoji"),
+      temp: document.getElementById("temp"),
+      cond: document.getElementById("cond"),
+      humid: document.getElementById("humid"),
+      wind: document.getElementById("wind"),
+      feels: document.getElementById("feels"),
+      ltime: document.getElementById("ltime"),
+      greeting: document.getElementById("greeting"),
+      status: document.getElementById("status"),
+      refresh: document.getElementById("refresh"),
+      forecast: document.getElementById("forecast"),
+      city: document.getElementById("city"),
+      btnSearch: document.getElementById("btn-search"),
+      btnCast: document.getElementById("btn-cast"),
+      btnMyLoc: document.getElementById("btn-myloc"),
     };
+
+    // Storage helpers
     const save = (k,v) => localStorage.setItem(k, JSON.stringify(v));
     const load = (k,d=null) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
+
+    // Background selection
+    function setBackgroundByCode(code, isNight=false){
+      const info = WMO[code] || WMO[2];
+      document.body.className = isNight ? "bg-night" : `bg-${info.bg}`;
+    }
     function formatTimeLocal(dateStr){
       try{ return new Date(dateStr).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }catch{return "--:--";}
     }
-    function setBackgroundByCode(code, isNight=false){
-      const info = WMO[code] || WMO[2];
-      const cls = isNight ? "bg-night" : `bg-${info.bg}`;
-      document.body.className = cls;
-    }
-    function isNightByLocalTime(locTimeStr){ try{ const h = new Date(locTimeStr).getHours(); return (h >= 19 || h < 6);}catch{return false;} }
-    function maybeGreeting(code, name){
-      const todayKey = new Date().toDateString();
-      const stamp = load("greetStamp");
-      if (stamp === todayKey) { const prev = load("greetMsg", ""); if (prev) els.greeting.textContent = prev; return; }
-      const info = WMO[code] || WMO[2];
-      let msg;
-      if ([0,1].includes(code)) msg = `☀️ Good morning${name?`, ${name}`:""}! Bright and clear — perfect day to ship something awesome.`;
-      else if ([2,3,45,48].includes(code)) msg = `☁️ Good morning${name?`, ${name}`:""}! Cloudy skies — cozy coding weather.`;
-      else if ([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code)) msg = `🌧 Good morning${name?`, ${name}`:""}! Rainy vibes — great time to write code indoors.`;
-      else if ([71,73,75,77,85,86].includes(code)) msg = `❄️ Good morning${name?`, ${name}`:""}! Snowy mood — warm beverage and deep focus.`;
-      else if ([95,96,99].includes(code)) msg = `⛈️ Good morning${name?`, ${name}`:""}! Stormy out — perfect to build something big inside.`;
-      else msg = `🌤️ Good morning${name?`, ${name}`:""}! Let’s build something new today.`;
+
+    // Adaptive greeting (time + weather)
+    function adaptiveGreeting(code, name){
       const hr = new Date().getHours();
-      if (hr >= 6 && hr < 9) {
-        els.greeting.textContent = msg;
-        save("greetStamp", todayKey);
-        save("greetMsg", msg);
-      } else {
-        els.greeting.textContent = load("greetMsg", "Have a great day building!");
-      }
+      const base =
+        (hr >= 6 && hr < 12) ? "☀️ Good morning" :
+        (hr >= 12 && hr < 18) ? "🌤️ Good afternoon" :
+        "🌙 Good evening";
+      let tail = " Let’s build something new today.";
+      if ([0,1].includes(code)) tail = " Bright and clear — perfect day to ship!";
+      else if ([2,3,45,48].includes(code)) tail = " Cloudy skies — cozy coding weather.";
+      else if ([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code)) tail = " Rainy vibes — great time to code indoors.";
+      else if ([71,73,75,77,85,86].includes(code)) tail = " Snowy mood — warm beverage and deep focus.";
+      else if ([95,96,99].includes(code)) tail = " Stormy out — perfect to build something big inside.";
+      const msg = `${base}${name?`, ${name}`:""}!${tail}`;
+      els.greeting.textContent = msg;
+      save("greetMsg", msg);
     }
-    function kmh(ms){ return Math.round(ms * 3.6); }
+
+    // Relative "Updated Xm ago"
+    let lastUpdatedTs = null;
+    function setUpdatedNow(){
+      lastUpdatedTs = Date.now();
+      els.refresh.textContent = `Updated • ${new Date(lastUpdatedTs).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+    }
+    setInterval(()=>{
+      if (!lastUpdatedTs) return;
+      const mins = Math.floor((Date.now() - lastUpdatedTs)/60000);
+      if (mins <= 0) return;
+      els.refresh.textContent = `Updated • ${mins}m ago`;
+    }, 60000);
+
+    // Fetching
     async function fetchWeather(lat, lon){
-      const url = `${OPEN_METEO}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code&hourly=weather_code,temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=5&timezone=auto`;
+      // Add current.is_day for precise day/night
+      const url = `${OPEN_METEO}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code,is_day&hourly=weather_code,temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=5&timezone=auto`;
       const res = await fetch(url, { cache:"no-store" });
       if (!res.ok) throw new Error("Weather fetch failed");
       return res.json();
@@ -180,13 +216,16 @@
       const r = data.results[0];
       return { name: r.name, latitude: r.latitude, longitude: r.longitude, country:r.country };
     }
+
+    // Render
     function render(data, placeName = "Your location"){
       try{
         const cur = data.current;
         const daily = data.daily;
         const code = cur.weather_code;
         const info = WMO[code] || {t:"Unknown", e:"⛅", bg:"cloudy"};
-        const isNight = isNightByLocalTime(cur.time);
+        const isNight = (typeof cur.is_day === "number") ? (cur.is_day === 0) : false;
+
         setBackgroundByCode(code, isNight);
         els.emoji.textContent = info.e;
         els.temp.textContent = `${Math.round(cur.temperature_2m)}°C`;
@@ -194,9 +233,19 @@
         els.humid.textContent = `${Math.round(cur.relative_humidity_2m)}%`;
         els.wind.textContent = `${Math.round(cur.wind_speed_10m)} km/h`;
         els.feels.textContent = `${Math.round(cur.apparent_temperature ?? cur.temperature_2m)}°C`;
-        // Always update local time from API’s timezone-adjusted current.time
         els.ltime.textContent = formatTimeLocal(cur.time);
-        maybeGreeting(code, (placeName || "").split(",")[0]);
+
+        // Temp-change alert
+        const prevTemp = load("lastTemp", null);
+        if (prevTemp !== null && Math.abs(prevTemp - cur.temperature_2m) > 3){
+          toast(`🌡️ Temp changed ${Math.round(cur.temperature_2m - prevTemp)}°C since last check`);
+        }
+        save("lastTemp", cur.temperature_2m);
+
+        // Adaptive greeting
+        adaptiveGreeting(code, (placeName || "").split(",")[0]);
+
+        // Forecast
         els.forecast.innerHTML = "";
         if (daily && daily.time && daily.time.length){
           const days = daily.time.slice(0,5);
@@ -211,31 +260,39 @@
             node.innerHTML = `
               <div class="fday">${label}</div>
               <div style="font-size:18px;margin:4px 0">${dinfo.e}</div>
-              <div class="ftemp">${max}° / ${min}°</div>
+              <div class="ftemp">↑${max}° ↓${min}°</div>
             `;
             els.forecast.appendChild(node);
           });
         }
+
         save("lastWeather", { data, placeName, ts: Date.now() });
-      }catch(err){ console.error(err); els.status.textContent = "Render error"; }
+      }catch(err){
+        console.error(err);
+        els.status.textContent = "Render error";
+      }
     }
+
     async function loadByCoords(lat, lon, label="Your location"){
       els.status.textContent = "Loading weather…";
       try{
         const data = await fetchWeather(lat, lon);
         render(data, label);
-        els.status.textContent = `Updated • ${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+        setUpdatedNow();
+        els.status.textContent = "";
       }catch(err){
         console.error(err);
-        els.status.textContent = "Network error. Showing cached data if available.";
+        els.status.textContent = "Offline — showing saved weather data ☁️";
         const cache = load("lastWeather");
         if (cache){ render(cache.data, cache.placeName || label); }
       }
     }
+
     async function initGeolocation(){
       return new Promise((resolve)=>{
         if (!navigator.geolocation){
-          resolve({ coords: { latitude: DEFAULT_CITY.latitude, longitude: DEFAULT_CITY.longitude }, from:"fallback" }); return;
+          resolve({ coords: { latitude: DEFAULT_CITY.latitude, longitude: DEFAULT_CITY.longitude }, from:"fallback" });
+          return;
         }
         navigator.geolocation.getCurrentPosition(
           (pos)=> resolve({ coords: pos.coords, from:"geo" }),
@@ -244,51 +301,56 @@
         );
       });
     }
+
+    // Refresh control follows current view
     let lastGeo = null;
     let refreshTimer = null;
     function scheduleAutoRefresh(lat, lon, label){
       const threeHours = 3 * 60 * 60 * 1000;
-      els.refresh.textContent = "Auto refresh: 3h";
       if (refreshTimer) clearInterval(refreshTimer);
-      refreshTimer = setInterval(()=>loadByCoords(lat, lon, label), threeHours);
+      refreshTimer = setInterval(()=> loadByCoords(lat, lon, label), threeHours);
+      // Single visibility listener per schedule
       document.addEventListener("visibilitychange", ()=>{
         if (!document.hidden){ loadByCoords(lat, lon, label); }
       }, { once:true });
     }
+
+    // Cast/share
     function castWeather(){
       const text = `Weather: ${els.temp.textContent} • ${els.cond.textContent} • ${els.humid.textContent} humidity • ${els.wind.textContent} wind`;
-      if (navigator.share){
-        navigator.share({ text }).catch(()=>copy(text));
-      } else { copy(text); toast("Copied weather to clipboard"); }
+      if (navigator.share){ navigator.share({ text }).catch(()=>copy(text)); }
+      else { copy(text); toast("Copied weather to clipboard"); }
     }
     function copy(t){ try{ navigator.clipboard.writeText(t); }catch{} }
     function toast(msg){
       els.status.textContent = msg;
-      setTimeout(()=> els.status.textContent = "", 2000);
+      setTimeout(()=> els.status.textContent = "", 2500);
     }
+
+    // Events
     els.btnSearch.addEventListener("click", async ()=>{
       const q = els.city.value.trim();
       if (!q) return;
       els.status.textContent = "Searching city…";
       try{
         const loc = await geocodeCity(q);
-        await loadByCoords(loc.latitude, loc.longitude, `${loc.name}, ${loc.country || ""}`.trim());
-        scheduleAutoRefresh(loc.latitude, loc.longitude, `${loc.name}, ${loc.country || ""}`.trim());
+        els.city.blur(); // smoother mobile UX
+        const label = `${loc.name}, ${loc.country || ""}`.trim();
+        await loadByCoords(loc.latitude, loc.longitude, label);
+        scheduleAutoRefresh(loc.latitude, loc.longitude, label);
         save("lastCity", loc);
       }catch(err){
         console.error(err);
         els.status.textContent = "City not found";
       }
     });
-    els.city.addEventListener("keydown", (e)=>{
-      if (e.key === "Enter") els.btnSearch.click();
-    });
+    els.city.addEventListener("keydown", (e)=>{ if (e.key === "Enter") els.btnSearch.click(); });
     els.btnCast.addEventListener("click", castWeather);
     els.btnMyLoc.addEventListener("click", async ()=>{
-      if (lastGeo) {
-        els.status.textContent = "Returning to your location…";
-        await loadByCoords(lastGeo.lat, lastGeo.lon, "Your location");
-        scheduleAutoRefresh(lastGeo.lat, lastGeo.lon, "Your location");
+      if (lastGeo){
+        const label = "Your location";
+        await loadByCoords(lastGeo.lat, lastGeo.lon, label);
+        scheduleAutoRefresh(lastGeo.lat, lastGeo.lon, label);
       } else {
         els.status.textContent = "Detecting location…";
         const { coords } = await initGeolocation();
@@ -297,16 +359,20 @@
         scheduleAutoRefresh(coords.latitude, coords.longitude, "Your location");
       }
     });
+
+    // Boot
     (async function boot(){
       const cached = load("lastWeather");
-      if (cached) render(cached.data, cached.placeName);
+      if (cached) { render(cached.data, cached.placeName); }
+
       const { coords, from } = await initGeolocation();
       const label = from === "geo" ? "Your location" : `${DEFAULT_CITY.name}`;
       lastGeo = { lat: coords.latitude, lon: coords.longitude };
       await loadByCoords(coords.latitude, coords.longitude, label);
       scheduleAutoRefresh(coords.latitude, coords.longitude, label);
+
       const lastCity = load("lastCity");
-      if (lastCity){ els.city.placeholder = `Try: ${lastCity.name}`; }
+      if (lastCity) els.city.placeholder = `Try: ${lastCity.name}`;
     })();
   </script>
 </body>
