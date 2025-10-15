@@ -7,6 +7,30 @@
   <meta name="theme-color" content="#9d4df1" />
   <link rel="icon" href="data:image/svg+xml,%F0%9F%8C%A4" />
   <meta name="description" content="Get live weather, daily forecasts, adaptive greetings, and morning notifications right inside Farcaster." />
+  
+  <!-- Farcaster Mini App Metadata -->
+  <meta name="fc:miniapp" content='{
+    "version":"1",
+    "imageUrl":"https://weather-base-app.vercel.app/image.png",
+    "button":{
+      "title":"Weather",
+      "action":{
+        "type":"launch_miniapp",
+        "name":"Weather",
+        "url":"https://weather-base-app.vercel.app/",
+        "splashImageUrl":"https://weather-base-app.vercel.app/splash.png",
+        "splashBackgroundColor":"#111111"
+      }
+    }
+  }' />
+  
+  <!-- Open Graph -->
+  <meta property="og:title" content="Weather • Farcaster MiniApp" />
+  <meta property="og:description" content="Get live weather, daily forecasts, and adaptive greetings right inside Farcaster." />
+  <meta property="og:image" content="https://weather-base-app.vercel.app/image.png" />
+  <meta property="og:url" content="https://weather-base-app.vercel.app/" />
+  <meta name="twitter:card" content="summary_large_image" />
+
   <style>
     :root{
       --purple:#9d4df1;
@@ -36,6 +60,7 @@
     input[type="text"]{ flex:1; border-radius:10px; border:1px solid #303040; background:#12121a; color:var(--text); padding:10px 12px; outline:none; }
     input::placeholder{ color:#8b8fa3 }
     button{ border:none; background:var(--purple); color:white; border-radius:10px; padding:10px 12px; font-weight:600; cursor:pointer; transition: filter .2s ease, transform .02s; }
+    button:hover{ filter: brightness(1.1); }
     button:active{ transform: translateY(1px) }
     .ghost{ background:transparent; border:1px solid #40355e; color:#d9c9ff; }
     .row{ display:flex; gap:12px; align-items:stretch; }
@@ -50,20 +75,22 @@
     .hint{ color:#9aa1b7; font-size:12px }
     .small{ font-size:12px; color:#aab0c5 }
     .greeting{ margin:12px 0 0; padding:10px 12px; border-radius:10px; background:rgba(157,77,241,0.12); border:1px solid #3b1a72; color:#eadbff; font-size:14px; }
-
     .forecast{ display:flex; gap:8px; overflow-x:auto; padding:6px 2px 2px; margin-top:10px; -ms-overflow-style: none; scrollbar-width: none; }
     .forecast::-webkit-scrollbar{ display:none; }
     .fcard{ min-width:72px; border:1px solid var(--glass-bd); background:rgba(255,255,255,0.04); border-radius:10px; padding:8px; text-align:center; font-size:12px; }
     .fday{ color:#cbd2e6; font-weight:600; }
     .ftemp{ font-weight:700; font-size:13px }
-
+    .share-row{ display:flex; gap:8px; margin-top:12px; }
+    .share-row button{ flex:1; }
     .bg-sunny{ background: linear-gradient(160deg, #FFB347 0%, #FF8C42 60%, #6b21a8 120%) fixed; }
     .bg-cloudy{ background: linear-gradient(160deg, #87CEEB 0%, #4682B4 60%, #312e81 120%) fixed; }
     .bg-rainy{ background: linear-gradient(160deg, #1e3a8a 0%, #1e40af 60%, #111827 120%) fixed; }
     .bg-night{ background: linear-gradient(160deg, #2e1065 0%, #581c87 60%, #111827 120%) fixed; }
-
     @media (prefers-reduced-motion: reduce){ *{ transition:none !important; animation:none !important; } }
   </style>
+
+  <!-- Farcaster SDK -->
+  <script src="https://unpkg.com/@farcaster/auth-kit@0.1.4/dist/index.js"></script>
 </head>
 <body class="bg-night">
   <div class="wrap">
@@ -74,13 +101,12 @@
           <span>Weather</span>
           <span class="badge">Farcaster</span>
         </div>
-        <button id="btn-cast" class="ghost" title="Cast Weather">🟣 Cast</button>
+        <button id="btn-myloc" class="ghost" title="Back to my location" aria-label="Back to my location">📍</button>
       </div>
 
       <div class="search" role="search">
         <input id="city" type="text" inputmode="search" placeholder="Search city (e.g., Bangalore)" aria-label="Search city" />
         <button id="btn-search" aria-label="Search weather">Search</button>
-        <button id="btn-myloc" class="ghost" title="Back to my location" aria-label="Back to my location">📍</button>
       </div>
 
       <div class="hero" aria-live="polite">
@@ -108,6 +134,12 @@
       <div class="forecast" id="forecast" aria-label="Forecast"></div>
 
       <div class="greeting" id="greeting" role="status">Fetching your greeting…</div>
+
+      <!-- Share buttons -->
+      <div class="share-row">
+        <button id="btn-share-fc" title="Share on Farcaster">🟣 Share on Farcaster</button>
+        <button id="btn-copy" class="ghost" title="Copy weather">📋 Copy</button>
+      </div>
 
       <div class="foot">
         <div class="hint" id="status">Detecting location…</div>
@@ -151,8 +183,9 @@
       forecast: document.getElementById("forecast"),
       city: document.getElementById("city"),
       btnSearch: document.getElementById("btn-search"),
-      btnCast: document.getElementById("btn-cast"),
       btnMyLoc: document.getElementById("btn-myloc"),
+      btnShareFc: document.getElementById("btn-share-fc"),
+      btnCopy: document.getElementById("btn-copy")
     };
 
     // Storage helpers
@@ -171,7 +204,14 @@
       els.status.textContent = msg;
       setTimeout(()=> els.status.textContent = "", 2500);
     }
-    function copy(t){ try{ navigator.clipboard.writeText(t); }catch{} }
+    function copy(t){ 
+      try{ 
+        navigator.clipboard.writeText(t);
+        toast("📋 Copied to clipboard!");
+      }catch{
+        toast("Copy failed");
+      } 
+    }
 
     // Adaptive greeting (time + weather)
     function adaptiveGreeting(code, name){
@@ -180,7 +220,7 @@
         (hr >= 6 && hr < 12) ? "☀️ Good morning" :
         (hr >= 12 && hr < 18) ? "🌤️ Good afternoon" :
         "🌙 Good evening";
-      let tail = " Let’s build something new today.";
+      let tail = " Let's build something new today.";
       if ([0,1].includes(code)) tail = " Bright and clear — perfect day to ship!";
       else if ([2,3,45,48].includes(code)) tail = " Cloudy skies — cozy coding weather.";
       else if ([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code)) tail = " Rainy vibes — great time to code indoors.";
@@ -206,7 +246,6 @@
 
     // Weather fetch
     async function fetchWeather(lat, lon){
-      // includes current.is_day for precise night detection
       const url = `${OPEN_METEO}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code,is_day&hourly=weather_code,temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=5&timezone=auto`;
       const res = await fetch(url, { cache:"no-store" });
       if (!res.ok) throw new Error("Weather fetch failed");
@@ -331,21 +370,35 @@
         save("lastGreetDate", today);
       }
     }
-    // Ask once for notification permission
     if ("Notification" in window && Notification.permission === "default") {
       try { Notification.requestPermission().catch(()=>{}); } catch {}
     }
-    // Hourly window check (6–9 AM local device time)
     setInterval(()=>{
       const hr = new Date().getHours();
       if (hr >= 6 && hr < 9) checkMorningGreeting();
     }, 60 * 60 * 1000);
 
-    // Share/Cast
-    function castWeather(){
-      const text = `Weather: ${els.temp.textContent} • ${els.cond.textContent} • ${els.humid.textContent} humidity • ${els.wind.textContent} wind`;
-      if (navigator.share){ navigator.share({ text }).catch(()=>copy(text)); }
-      else { copy(text); toast("Copied weather to clipboard"); }
+    // Generate weather text for sharing
+    function getWeatherText(){
+      const emoji = els.emoji.textContent;
+      const temp = els.temp.textContent;
+      const cond = els.cond.textContent;
+      const humid = els.humid.textContent;
+      const wind = els.wind.textContent;
+      return `${emoji} Weather Update\n\n${temp} ${cond}\n💧 ${humid} humidity • 🍃 ${wind} wind\n\nvia Weather MiniApp on Farcaster 🟣`;
+    }
+
+    // Share on Farcaster
+    function shareOnFarcaster(){
+      const text = encodeURIComponent(getWeatherText());
+      const url = `https://warpcast.com/~/compose?text=${text}&embeds[]=https://weather-base-app.vercel.app/`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+      toast("Opening Warpcast composer...");
+    }
+
+    // Copy to clipboard
+    function copyWeather(){
+      copy(getWeatherText());
     }
 
     // Events
@@ -366,7 +419,8 @@
       }
     });
     els.city.addEventListener("keydown", (e)=>{ if (e.key === "Enter") els.btnSearch.click(); });
-    els.btnCast.addEventListener("click", castWeather);
+    els.btnShareFc.addEventListener("click", shareOnFarcaster);
+    els.btnCopy.addEventListener("click", copyWeather);
     els.btnMyLoc.addEventListener("click", async ()=>{
       if (lastGeo){
         const label = "Your location";
@@ -395,7 +449,6 @@
       const lastCity = load("lastCity");
       if (lastCity) els.city.placeholder = `Try: ${lastCity.name}`;
 
-      // Morning greeting check on first open in window 6–9 AM
       const hr = new Date().getHours();
       if (hr >= 6 && hr < 9) checkMorningGreeting();
     })();
