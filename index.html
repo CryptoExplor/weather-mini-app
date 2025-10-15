@@ -6,7 +6,7 @@
   <title>Weather • Farcaster MiniApp</title>
   <meta name="theme-color" content="#9d4df1" />
   <link rel="icon" href="data:image/svg+xml,%F0%9F%8C%A4" />
-  <meta name="description" content="Get live weather, daily forecasts, and adaptive greetings right inside Farcaster." />
+  <meta name="description" content="Get live weather, daily forecasts, adaptive greetings, and morning notifications right inside Farcaster." />
   <style>
     :root{
       --purple:#9d4df1;
@@ -122,7 +122,7 @@
     const GEO_CODE   = "https://geocoding-api.open-meteo.com/v1/search";
     const DEFAULT_CITY = { name:"Bangalore", latitude:12.9716, longitude:77.5946 };
 
-    // Weather code mapping
+    // WMO codes
     const WMO = {
       0:{t:"Clear sky",e:"☀️",bg:"sunny"}, 1:{t:"Mainly clear",e:"🌤️",bg:"sunny"}, 2:{t:"Partly cloudy",e:"⛅",bg:"cloudy"}, 3:{t:"Overcast",e:"☁️",bg:"cloudy"},
       45:{t:"Fog",e:"🌫️",bg:"cloudy"}, 48:{t:"Depositing rime fog",e:"🌫️",bg:"cloudy"},
@@ -159,7 +159,7 @@
     const save = (k,v) => localStorage.setItem(k, JSON.stringify(v));
     const load = (k,d=null) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 
-    // Background selection
+    // UI helpers
     function setBackgroundByCode(code, isNight=false){
       const info = WMO[code] || WMO[2];
       document.body.className = isNight ? "bg-night" : `bg-${info.bg}`;
@@ -167,6 +167,11 @@
     function formatTimeLocal(dateStr){
       try{ return new Date(dateStr).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }catch{return "--:--";}
     }
+    function toast(msg){
+      els.status.textContent = msg;
+      setTimeout(()=> els.status.textContent = "", 2500);
+    }
+    function copy(t){ try{ navigator.clipboard.writeText(t); }catch{} }
 
     // Adaptive greeting (time + weather)
     function adaptiveGreeting(code, name){
@@ -199,9 +204,9 @@
       els.refresh.textContent = `Updated • ${mins}m ago`;
     }, 60000);
 
-    // Fetching
+    // Weather fetch
     async function fetchWeather(lat, lon){
-      // Add current.is_day for precise day/night
+      // includes current.is_day for precise night detection
       const url = `${OPEN_METEO}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code,is_day&hourly=weather_code,temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=5&timezone=auto`;
       const res = await fetch(url, { cache:"no-store" });
       if (!res.ok) throw new Error("Weather fetch failed");
@@ -291,8 +296,7 @@
     async function initGeolocation(){
       return new Promise((resolve)=>{
         if (!navigator.geolocation){
-          resolve({ coords: { latitude: DEFAULT_CITY.latitude, longitude: DEFAULT_CITY.longitude }, from:"fallback" });
-          return;
+          resolve({ coords: { latitude: DEFAULT_CITY.latitude, longitude: DEFAULT_CITY.longitude }, from:"fallback" }); return;
         }
         navigator.geolocation.getCurrentPosition(
           (pos)=> resolve({ coords: pos.coords, from:"geo" }),
@@ -302,29 +306,46 @@
       });
     }
 
-    // Refresh control follows current view
+    // Schedules
     let lastGeo = null;
     let refreshTimer = null;
     function scheduleAutoRefresh(lat, lon, label){
       const threeHours = 3 * 60 * 60 * 1000;
       if (refreshTimer) clearInterval(refreshTimer);
       refreshTimer = setInterval(()=> loadByCoords(lat, lon, label), threeHours);
-      // Single visibility listener per schedule
       document.addEventListener("visibilitychange", ()=>{
         if (!document.hidden){ loadByCoords(lat, lon, label); }
       }, { once:true });
     }
 
-    // Cast/share
+    // Morning greeting check + optional notifications
+    function checkMorningGreeting(){
+      const lastMsgDate = load("lastGreetDate", "");
+      const today = new Date().toDateString();
+      if (lastMsgDate !== today) {
+        const greetMsg = load("greetMsg", "Good morning!");
+        toast(greetMsg);
+        if ("Notification" in window && Notification.permission === "granted") {
+          try { new Notification("🌤️ Daily Weather", { body: greetMsg }); } catch {}
+        }
+        save("lastGreetDate", today);
+      }
+    }
+    // Ask once for notification permission
+    if ("Notification" in window && Notification.permission === "default") {
+      try { Notification.requestPermission().catch(()=>{}); } catch {}
+    }
+    // Hourly window check (6–9 AM local device time)
+    setInterval(()=>{
+      const hr = new Date().getHours();
+      if (hr >= 6 && hr < 9) checkMorningGreeting();
+    }, 60 * 60 * 1000);
+
+    // Share/Cast
     function castWeather(){
       const text = `Weather: ${els.temp.textContent} • ${els.cond.textContent} • ${els.humid.textContent} humidity • ${els.wind.textContent} wind`;
       if (navigator.share){ navigator.share({ text }).catch(()=>copy(text)); }
       else { copy(text); toast("Copied weather to clipboard"); }
-    }
-    function copy(t){ try{ navigator.clipboard.writeText(t); }catch{} }
-    function toast(msg){
-      els.status.textContent = msg;
-      setTimeout(()=> els.status.textContent = "", 2500);
     }
 
     // Events
@@ -334,7 +355,7 @@
       els.status.textContent = "Searching city…";
       try{
         const loc = await geocodeCity(q);
-        els.city.blur(); // smoother mobile UX
+        els.city.blur();
         const label = `${loc.name}, ${loc.country || ""}`.trim();
         await loadByCoords(loc.latitude, loc.longitude, label);
         scheduleAutoRefresh(loc.latitude, loc.longitude, label);
@@ -373,6 +394,10 @@
 
       const lastCity = load("lastCity");
       if (lastCity) els.city.placeholder = `Try: ${lastCity.name}`;
+
+      // Morning greeting check on first open in window 6–9 AM
+      const hr = new Date().getHours();
+      if (hr >= 6 && hr < 9) checkMorningGreeting();
     })();
   </script>
 </body>
