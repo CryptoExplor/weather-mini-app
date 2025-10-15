@@ -8,6 +8,9 @@
   <link rel="icon" href="data:image/svg+xml,%F0%9F%8C%A4" />
   <meta name="description" content="Get live weather, daily forecasts, adaptive greetings, and morning notifications right inside Farcaster." />
   
+  <!-- Preconnect for Quick Auth performance -->
+  <link rel="preconnect" href="https://auth.farcaster.xyz" />
+  
   <!-- Farcaster Mini App Metadata -->
   <meta name="fc:miniapp" content='{
     "version":"1",
@@ -56,12 +59,14 @@
     .header{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
     .title{ display:flex; align-items:center; gap:8px; font-weight:700; letter-spacing:.2px; }
     .badge{ padding:2px 8px; border-radius:999px; background:#201235; color:#caa9ff; border:1px solid #3b1a72; font-size:12px; }
+    .user-badge{ padding:2px 8px; border-radius:999px; background:#1a2035; color:#a9c9ff; border:1px solid #1a3b72; font-size:11px; }
     .search{ display:flex; gap:8px; margin:10px 0 12px; }
     input[type="text"]{ flex:1; border-radius:10px; border:1px solid #303040; background:#12121a; color:var(--text); padding:10px 12px; outline:none; }
     input::placeholder{ color:#8b8fa3 }
     button{ border:none; background:var(--purple); color:white; border-radius:10px; padding:10px 12px; font-weight:600; cursor:pointer; transition: filter .2s ease, transform .02s; }
     button:hover{ filter: brightness(1.1); }
     button:active{ transform: translateY(1px) }
+    button:disabled{ opacity:0.5; cursor:not-allowed; }
     .ghost{ background:transparent; border:1px solid #40355e; color:#d9c9ff; }
     .row{ display:flex; gap:12px; align-items:stretch; }
     .col{ flex:1 }
@@ -88,9 +93,6 @@
     .bg-night{ background: linear-gradient(160deg, #2e1065 0%, #581c87 60%, #111827 120%) fixed; }
     @media (prefers-reduced-motion: reduce){ *{ transition:none !important; animation:none !important; } }
   </style>
-
-  <!-- Farcaster SDK -->
-  <script src="https://unpkg.com/@farcaster/auth-kit@0.1.4/dist/index.js"></script>
 </head>
 <body class="bg-night">
   <div class="wrap">
@@ -100,6 +102,7 @@
           <span style="font-size:20px">🌤️</span>
           <span>Weather</span>
           <span class="badge">Farcaster</span>
+          <span class="user-badge" id="user-fid" style="display:none"></span>
         </div>
         <button id="btn-myloc" class="ghost" title="Back to my location" aria-label="Back to my location">📍</button>
       </div>
@@ -137,8 +140,12 @@
 
       <!-- Share buttons -->
       <div class="share-row">
-        <button id="btn-share-fc" title="Share on Farcaster">🟣 Share on Farcaster</button>
+        <button id="btn-cast" title="Cast weather on Farcaster">🟣 Cast Weather</button>
         <button id="btn-copy" class="ghost" title="Copy weather">📋 Copy</button>
+      </div>
+
+      <div class="share-row">
+        <button id="btn-add-miniapp" class="ghost" title="Add to your mini apps">➕ Add MiniApp</button>
       </div>
 
       <div class="foot">
@@ -148,7 +155,9 @@
     </div>
   </div>
 
-  <script defer>
+  <script type="module">
+    import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
+
     // Endpoints
     const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
     const GEO_CODE   = "https://geocoding-api.open-meteo.com/v1/search";
@@ -184,8 +193,10 @@
       city: document.getElementById("city"),
       btnSearch: document.getElementById("btn-search"),
       btnMyLoc: document.getElementById("btn-myloc"),
-      btnShareFc: document.getElementById("btn-share-fc"),
-      btnCopy: document.getElementById("btn-copy")
+      btnCast: document.getElementById("btn-cast"),
+      btnCopy: document.getElementById("btn-copy"),
+      btnAddMiniapp: document.getElementById("btn-add-miniapp"),
+      userFid: document.getElementById("user-fid")
     };
 
     // Storage helpers
@@ -385,20 +396,75 @@
       const cond = els.cond.textContent;
       const humid = els.humid.textContent;
       const wind = els.wind.textContent;
-      return `${emoji} Weather Update\n\n${temp} ${cond}\n💧 ${humid} humidity • 🍃 ${wind} wind\n\nvia Weather MiniApp on Farcaster 🟣`;
+      return `${emoji} Weather Update\n\n${temp} ${cond}\n💧 ${humid} humidity • 🍃 ${wind} wind\n\nvia Weather MiniApp 🌤️`;
     }
 
-    // Share on Farcaster
-    function shareOnFarcaster(){
-      const text = encodeURIComponent(getWeatherText());
-      const url = `https://warpcast.com/~/compose?text=${text}&embeds[]=https://weather-base-app.vercel.app/`;
-      window.open(url, '_blank', 'noopener,noreferrer');
-      toast("Opening Warpcast composer...");
+    // Cast weather using Farcaster SDK
+    async function castWeather(){
+      try {
+        els.btnCast.disabled = true;
+        els.btnCast.textContent = "Casting...";
+        
+        const result = await sdk.actions.composeCast({
+          text: getWeatherText(),
+          embeds: ["https://weather-base-app.vercel.app/"]
+        });
+
+        if (result?.cast) {
+          toast(`✅ Cast posted! Hash: ${result.cast.hash.slice(0,10)}...`);
+          console.log("Cast hash:", result.cast.hash);
+          if (result.cast.channelKey) {
+            console.log("Posted to channel:", result.cast.channelKey);
+          }
+        } else {
+          toast("Cast cancelled");
+        }
+      } catch(err) {
+        console.error("Cast error:", err);
+        toast("Cast failed - try copy instead");
+      } finally {
+        els.btnCast.disabled = false;
+        els.btnCast.textContent = "🟣 Cast Weather";
+      }
     }
 
     // Copy to clipboard
     function copyWeather(){
       copy(getWeatherText());
+    }
+
+    // Add MiniApp using Farcaster SDK
+    async function addMiniApp(){
+      try {
+        els.btnAddMiniapp.disabled = true;
+        els.btnAddMiniapp.textContent = "Adding...";
+        
+        await sdk.actions.addMiniApp();
+        toast("✅ MiniApp added!");
+      } catch(err) {
+        console.error("Add MiniApp error:", err);
+        toast("Add MiniApp failed");
+      } finally {
+        els.btnAddMiniapp.disabled = false;
+        els.btnAddMiniapp.textContent = "➕ Add MiniApp";
+      }
+    }
+
+    // Initialize Farcaster context
+    let farcasterUser = null;
+    async function initFarcasterContext(){
+      try {
+        // Try to get authenticated user via Quick Auth
+        const context = await sdk.context;
+        if (context?.user?.fid) {
+          farcasterUser = context.user;
+          els.userFid.textContent = `FID: ${farcasterUser.fid}`;
+          els.userFid.style.display = "inline-flex";
+          console.log("Farcaster user:", farcasterUser);
+        }
+      } catch(err) {
+        console.log("No Farcaster context (running outside miniapp):", err);
+      }
     }
 
     // Events
@@ -419,8 +485,9 @@
       }
     });
     els.city.addEventListener("keydown", (e)=>{ if (e.key === "Enter") els.btnSearch.click(); });
-    els.btnShareFc.addEventListener("click", shareOnFarcaster);
+    els.btnCast.addEventListener("click", castWeather);
     els.btnCopy.addEventListener("click", copyWeather);
+    els.btnAddMiniapp.addEventListener("click", addMiniApp);
     els.btnMyLoc.addEventListener("click", async ()=>{
       if (lastGeo){
         const label = "Your location";
@@ -435,11 +502,16 @@
       }
     });
 
-    // Boot
+    // Boot sequence
     (async function boot(){
+      // Show cached data immediately
       const cached = load("lastWeather");
       if (cached) { render(cached.data, cached.placeName); }
 
+      // Initialize Farcaster context
+      await initFarcasterContext();
+
+      // Load weather
       const { coords, from } = await initGeolocation();
       const label = from === "geo" ? "Your location" : `${DEFAULT_CITY.name}`;
       lastGeo = { lat: coords.latitude, lon: coords.longitude };
@@ -451,6 +523,14 @@
 
       const hr = new Date().getHours();
       if (hr >= 6 && hr < 9) checkMorningGreeting();
+
+      // Signal to Farcaster that app is ready
+      try {
+        await sdk.actions.ready();
+        console.log("✅ Farcaster SDK ready");
+      } catch(err) {
+        console.log("Not in Farcaster context or SDK error:", err);
+      }
     })();
   </script>
 </body>
