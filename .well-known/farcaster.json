@@ -23,6 +23,6 @@
     "signature": "SGwaEu9G2OpEIEOIhmPCRxvXzR89VJh2pa2tZujwgPICLkkU3CG0uSVGbj4NFZnpRhRfJAUT5tn+xicHTV/dGxs="
   },
   "baseBuilder": {
-    "ownerAddresses": ["0xA5f2c343813B6fb6fE947C2C4759F2c421a346a7"]
+    "ownerAddress": ["0xA5f2c343813B6fb6fE947C2C4759F2c421a346a7"]
   }
 }
