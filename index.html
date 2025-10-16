@@ -68,6 +68,7 @@
     button:active{ transform: translateY(1px) }
     button:disabled{ opacity:0.5; cursor:not-allowed; }
     .ghost{ background:transparent; border:1px solid #40355e; color:#d9c9ff; }
+    .small-btn{ padding:6px 10px; font-size:12px; }
     .row{ display:flex; gap:12px; align-items:stretch; }
     .col{ flex:1 }
     .hero{ display:flex; gap:12px; align-items:center; margin:10px 0 14px; }
@@ -80,6 +81,7 @@
     .hint{ color:#9aa1b7; font-size:12px }
     .small{ font-size:12px; color:#aab0c5 }
     .greeting{ margin:12px 0 0; padding:10px 12px; border-radius:10px; background:rgba(157,77,241,0.12); border:1px solid #3b1a72; color:#eadbff; font-size:14px; }
+    .alert{ margin:12px 0 0; padding:10px 12px; border-radius:10px; background:rgba(239,68,68,0.12); border:1px solid #721a1a; color:#ffeadb; font-size:13px; display:none; }
     .forecast{ display:flex; gap:8px; overflow-x:auto; padding:6px 2px 2px; margin-top:10px; -ms-overflow-style: none; scrollbar-width: none; }
     .forecast::-webkit-scrollbar{ display:none; }
     .fcard{ min-width:72px; border:1px solid var(--glass-bd); background:rgba(255,255,255,0.04); border-radius:10px; padding:8px; text-align:center; font-size:12px; }
@@ -87,6 +89,9 @@
     .ftemp{ font-weight:700; font-size:13px }
     .share-row{ display:flex; gap:8px; margin-top:12px; }
     .share-row button{ flex:1; }
+    .settings-row{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+    .settings-row button{ flex:0 0 auto; }
+    .map-container{ margin-top:12px; border-radius:10px; overflow:hidden; border:1px solid var(--glass-bd); display:none; height:200px; background:rgba(255,255,255,0.04); align-items:center; justify-content:center; color:var(--muted); font-size:13px; }
     .bg-sunny{ background: linear-gradient(160deg, #FFB347 0%, #FF8C42 60%, #6b21a8 120%) fixed; }
     .bg-cloudy{ background: linear-gradient(160deg, #87CEEB 0%, #4682B4 60%, #312e81 120%) fixed; }
     .bg-rainy{ background: linear-gradient(160deg, #1e3a8a 0%, #1e40af 60%, #111827 120%) fixed; }
@@ -100,7 +105,7 @@
       <div class="header">
         <div class="title" aria-live="polite">
           <span style="font-size:20px">🌤️</span>
-          <span>Weather</span>
+          <span id="app-title">Weather</span>
           <span class="badge">Farcaster</span>
           <span class="user-badge" id="user-fid" style="display:none"></span>
         </div>
@@ -108,14 +113,14 @@
       </div>
 
       <div class="search" role="search">
-        <input id="city" type="text" inputmode="search" placeholder="Search city (e.g., Bangalore)" aria-label="Search city" />
+        <input id="city" type="text" inputmode="search" placeholder="Search city" aria-label="Search city" />
         <button id="btn-search" aria-label="Search weather">Search</button>
       </div>
 
       <div class="hero" aria-live="polite">
         <div style="font-size:38px" id="emoji">⛅</div>
         <div>
-          <div class="temp" id="temp">--°C</div>
+          <div class="temp" id="temp">--°</div>
           <div class="condition" id="cond">Loading...</div>
         </div>
       </div>
@@ -125,27 +130,43 @@
           <div class="chip" title="Humidity"><span>💧</span><span id="humid">--%</span></div>
         </div>
         <div class="col">
-          <div class="chip" title="Wind speed"><span>🍃</span><span id="wind">-- km/h</span></div>
+          <div class="chip" title="Wind speed"><span>🍃</span><span id="wind">--</span></div>
         </div>
       </div>
 
       <div class="grid" aria-label="Details">
-        <div class="cell"><span>Feels like</span><span id="feels">--°C</span></div>
-        <div class="cell"><span>Local time</span><span id="ltime">--:--</span></div>
+        <div class="cell"><span id="label-feels">Feels like</span><span id="feels">--°</span></div>
+        <div class="cell"><span id="label-time">Local time</span><span id="ltime">--:--</span></div>
       </div>
 
+      <!-- Weather Alert (feature flag) -->
+      <div class="alert" id="alert" role="alert">⚠️ <span id="alert-text"></span></div>
+
       <div class="forecast" id="forecast" aria-label="Forecast"></div>
+
+      <!-- Map View (feature flag) -->
+      <div class="map-container" id="map-container">
+        🗺️ <span id="map-placeholder">Map view (OpenStreetMap integration)</span>
+      </div>
 
       <div class="greeting" id="greeting" role="status">Fetching your greeting…</div>
 
       <!-- Share buttons -->
       <div class="share-row">
-        <button id="btn-cast" title="Cast weather on Farcaster">🟣 Cast Weather</button>
-        <button id="btn-copy" class="ghost" title="Copy weather">📋 Copy</button>
+        <button id="btn-cast" title="Cast weather on Farcaster">🟣 <span id="btn-cast-text">Cast</span></button>
+        <button id="btn-copy" class="ghost" title="Copy weather">📋 <span id="btn-copy-text">Copy</span></button>
       </div>
 
       <div class="share-row">
-        <button id="btn-add-miniapp" class="ghost" title="Add to your mini apps">➕ Add MiniApp</button>
+        <button id="btn-add-miniapp" class="ghost" title="Add to your mini apps">➕ <span id="btn-add-text">Add MiniApp</span></button>
+      </div>
+
+      <!-- Settings (Units & Language) -->
+      <div class="settings-row">
+        <button id="btn-units" class="ghost small-btn">°C → °F</button>
+        <button id="btn-lang" class="ghost small-btn">EN</button>
+        <button id="btn-map" class="ghost small-btn" style="display:none;">🗺️ Map</button>
+        <button id="btn-alerts" class="ghost small-btn" style="display:none;">🔔 Alerts</button>
       </div>
 
       <div class="foot">
@@ -158,27 +179,164 @@
   <script type="module">
     import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
 
-    // Endpoints
+    // =====================================================
+    // FEATURE FLAGS - Toggle features on/off
+    // =====================================================
+    const FEATURES = {
+      ALERTS: true,          // Weather alerts/warnings
+      MAP_VIEW: true,        // Map overlay toggle
+      EXTENDED_FORECAST: true, // 7-day forecast
+      NOTIFICATIONS: true,   // Browser notifications
+      UNIT_TOGGLE: true,     // Temp/speed unit switching
+      LOCALIZATION: true     // Multi-language support
+    };
+
+    // =====================================================
+    // LOCALIZATION MODULE
+    // =====================================================
+    const TRANSLATIONS = {
+      en: {
+        appTitle: "Weather",
+        searchPlaceholder: "Search city (e.g., Bangalore)",
+        feelsLike: "Feels like",
+        localTime: "Local time",
+        humidity: "Humidity",
+        wind: "Wind",
+        castBtn: "Cast",
+        copyBtn: "Copy",
+        addBtn: "Add MiniApp",
+        searchBtn: "Search",
+        loading: "Loading...",
+        offline: "Offline — showing saved weather data ☁️",
+        cityNotFound: "City not found",
+        detectingLocation: "Detecting location…",
+        yourLocation: "Your location",
+        goodMorning: "☀️ Good morning",
+        goodAfternoon: "🌤️ Good afternoon",
+        goodEvening: "🌙 Good evening",
+        clearDay: "Bright and clear — perfect day to ship!",
+        cloudyDay: "Cloudy skies — cozy coding weather.",
+        rainyDay: "Rainy vibes — great time to code indoors.",
+        snowyDay: "Snowy mood — warm beverage and deep focus.",
+        stormyDay: "Stormy out — perfect to build something big inside.",
+        defaultDay: "Let's build something new today.",
+        copied: "📋 Copied to clipboard!",
+        castPosted: "✅ Cast posted!",
+        miniappAdded: "✅ MiniApp added!",
+        mapPlaceholder: "Map view (OpenStreetMap integration)"
+      },
+      es: {
+        appTitle: "Clima",
+        searchPlaceholder: "Buscar ciudad (ej., Madrid)",
+        feelsLike: "Se siente como",
+        localTime: "Hora local",
+        humidity: "Humedad",
+        wind: "Viento",
+        castBtn: "Publicar",
+        copyBtn: "Copiar",
+        addBtn: "Añadir App",
+        searchBtn: "Buscar",
+        loading: "Cargando...",
+        offline: "Sin conexión — mostrando datos guardados ☁️",
+        cityNotFound: "Ciudad no encontrada",
+        detectingLocation: "Detectando ubicación…",
+        yourLocation: "Tu ubicación",
+        goodMorning: "☀️ Buenos días",
+        goodAfternoon: "🌤️ Buenas tardes",
+        goodEvening: "🌙 Buenas noches",
+        clearDay: "Día despejado — perfecto para crear!",
+        cloudyDay: "Cielos nublados — clima perfecto para programar.",
+        rainyDay: "Ambiente lluvioso — ideal para codear dentro.",
+        snowyDay: "Día nevado — bebida caliente y concentración.",
+        stormyDay: "Tormenta afuera — perfecto para construir algo grande.",
+        defaultDay: "Construyamos algo nuevo hoy.",
+        copied: "📋 ¡Copiado al portapapeles!",
+        castPosted: "✅ ¡Publicación enviada!",
+        miniappAdded: "✅ ¡App añadida!",
+        mapPlaceholder: "Vista de mapa (integración OpenStreetMap)"
+      },
+      hi: {
+        appTitle: "मौसम",
+        searchPlaceholder: "शहर खोजें (जैसे, बेंगलुरु)",
+        feelsLike: "महसूस होता है",
+        localTime: "स्थानीय समय",
+        humidity: "नमी",
+        wind: "हवा",
+        castBtn: "पोस्ट करें",
+        copyBtn: "कॉपी करें",
+        addBtn: "ऐप जोड़ें",
+        searchBtn: "खोजें",
+        loading: "लोड हो रहा है...",
+        offline: "ऑफ़लाइन — सहेजा गया डेटा दिखा रहे हैं ☁️",
+        cityNotFound: "शहर नहीं मिला",
+        detectingLocation: "स्थान का पता लगा रहे हैं…",
+        yourLocation: "आपका स्थान",
+        goodMorning: "☀️ सुप्रभात",
+        goodAfternoon: "🌤️ शुभ दोपहर",
+        goodEvening: "🌙 शुभ संध्या",
+        clearDay: "साफ़ और स्पष्ट — कुछ नया बनाने का दिन!",
+        cloudyDay: "बादल छाए हैं — कोडिंग के लिए आरामदायक मौसम।",
+        rainyDay: "बारिश का मौसम — अंदर कोड करने का समय।",
+        snowyDay: "बर्फीला मौसम — गर्म पेय और गहरा फोकस।",
+        stormyDay: "तूफ़ान बाहर है — अंदर कुछ बड़ा बनाने का समय।",
+        defaultDay: "आज कुछ नया बनाएं।",
+        copied: "📋 क्लिपबोर्ड पर कॉपी किया!",
+        castPosted: "✅ पोस्ट भेजी गई!",
+        miniappAdded: "✅ ऐप जोड़ा गया!",
+        mapPlaceholder: "मैप व्यू (OpenStreetMap इंटीग्रेशन)"
+      }
+    };
+
+    // =====================================================
+    // UNIT CONVERSION MODULE
+    // =====================================================
+    const UNITS = {
+      temperature: {
+        celsius: { symbol: "°C", convert: (c) => c },
+        fahrenheit: { symbol: "°F", convert: (c) => (c * 9/5) + 32 }
+      },
+      speed: {
+        kmh: { symbol: "km/h", convert: (kmh) => kmh },
+        mph: { symbol: "mph", convert: (kmh) => kmh * 0.621371 }
+      }
+    };
+
+    // =====================================================
+    // STATE & CONFIG
+    // =====================================================
+    const STATE = {
+      currentLang: load("language", "en"),
+      currentTempUnit: load("tempUnit", "celsius"),
+      currentSpeedUnit: load("speedUnit", "kmh"),
+      mapVisible: false,
+      alertsEnabled: FEATURES.ALERTS
+    };
+
     const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
     const GEO_CODE   = "https://geocoding-api.open-meteo.com/v1/search";
     const DEFAULT_CITY = { name:"Bangalore", latitude:12.9716, longitude:77.5946 };
 
     // WMO codes
     const WMO = {
-      0:{t:"Clear sky",e:"☀️",bg:"sunny"}, 1:{t:"Mainly clear",e:"🌤️",bg:"sunny"}, 2:{t:"Partly cloudy",e:"⛅",bg:"cloudy"}, 3:{t:"Overcast",e:"☁️",bg:"cloudy"},
-      45:{t:"Fog",e:"🌫️",bg:"cloudy"}, 48:{t:"Depositing rime fog",e:"🌫️",bg:"cloudy"},
-      51:{t:"Light drizzle",e:"🌦️",bg:"rainy"}, 53:{t:"Moderate drizzle",e:"🌦️",bg:"rainy"}, 55:{t:"Dense drizzle",e:"🌧️",bg:"rainy"},
-      56:{t:"Freezing drizzle: light",e:"🌧️",bg:"rainy"}, 57:{t:"Freezing drizzle: dense",e:"🌧️",bg:"rainy"},
-      61:{t:"Slight rain",e:"🌧️",bg:"rainy"}, 63:{t:"Moderate rain",e:"🌧️",bg:"rainy"}, 65:{t:"Heavy rain",e:"🌧️",bg:"rainy"},
-      66:{t:"Freezing rain: light",e:"🌧️",bg:"rainy"}, 67:{t:"Freezing rain: heavy",e:"🌧️",bg:"rainy"},
-      71:{t:"Slight snow",e:"🌨️",bg:"cloudy"}, 73:{t:"Moderate snow",e:"❄️",bg:"cloudy"}, 75:{t:"Heavy snow",e:"❄️",bg:"cloudy"}, 77:{t:"Snow grains",e:"🌨️",bg:"cloudy"},
-      80:{t:"Rain showers: slight",e:"🌧️",bg:"rainy"}, 81:{t:"Rain showers: moderate",e:"🌧️",bg:"rainy"}, 82:{t:"Rain showers: violent",e:"🌧️",bg:"rainy"},
-      85:{t:"Snow showers: slight",e:"🌨️",bg:"cloudy"}, 86:{t:"Snow showers: heavy",e:"❄️",bg:"cloudy"},
-      95:{t:"Thunderstorm",e:"⛈️",bg:"rainy"}, 96:{t:"Thunderstorm with slight hail",e:"⛈️",bg:"rainy"}, 99:{t:"Thunderstorm with heavy hail",e:"⛈️",bg:"rainy"}
+      0:{t:"Clear sky",e:"☀️",bg:"sunny",alert:false}, 1:{t:"Mainly clear",e:"🌤️",bg:"sunny",alert:false}, 
+      2:{t:"Partly cloudy",e:"⛅",bg:"cloudy",alert:false}, 3:{t:"Overcast",e:"☁️",bg:"cloudy",alert:false},
+      45:{t:"Fog",e:"🌫️",bg:"cloudy",alert:false}, 48:{t:"Depositing rime fog",e:"🌫️",bg:"cloudy",alert:false},
+      51:{t:"Light drizzle",e:"🌦️",bg:"rainy",alert:false}, 53:{t:"Moderate drizzle",e:"🌦️",bg:"rainy",alert:false}, 
+      55:{t:"Dense drizzle",e:"🌧️",bg:"rainy",alert:false}, 56:{t:"Freezing drizzle: light",e:"🌧️",bg:"rainy",alert:true},
+      57:{t:"Freezing drizzle: dense",e:"🌧️",bg:"rainy",alert:true}, 61:{t:"Slight rain",e:"🌧️",bg:"rainy",alert:false},
+      63:{t:"Moderate rain",e:"🌧️",bg:"rainy",alert:false}, 65:{t:"Heavy rain",e:"🌧️",bg:"rainy",alert:true},
+      66:{t:"Freezing rain: light",e:"🌧️",bg:"rainy",alert:true}, 67:{t:"Freezing rain: heavy",e:"🌧️",bg:"rainy",alert:true},
+      71:{t:"Slight snow",e:"🌨️",bg:"cloudy",alert:false}, 73:{t:"Moderate snow",e:"❄️",bg:"cloudy",alert:false},
+      75:{t:"Heavy snow",e:"❄️",bg:"cloudy",alert:true}, 77:{t:"Snow grains",e:"🌨️",bg:"cloudy",alert:false},
+      80:{t:"Rain showers: slight",e:"🌧️",bg:"rainy",alert:false}, 81:{t:"Rain showers: moderate",e:"🌧️",bg:"rainy",alert:false},
+      82:{t:"Rain showers: violent",e:"🌧️",bg:"rainy",alert:true}, 85:{t:"Snow showers: slight",e:"🌨️",bg:"cloudy",alert:false},
+      86:{t:"Snow showers: heavy",e:"❄️",bg:"cloudy",alert:true}, 95:{t:"Thunderstorm",e:"⛈️",bg:"rainy",alert:true},
+      96:{t:"Thunderstorm with slight hail",e:"⛈️",bg:"rainy",alert:true}, 99:{t:"Thunderstorm with heavy hail",e:"⛈️",bg:"rainy",alert:true}
     };
 
     // DOM
     const els = {
+      appTitle: document.getElementById("app-title"),
       emoji: document.getElementById("emoji"),
       temp: document.getElementById("temp"),
       cond: document.getElementById("cond"),
@@ -187,6 +345,8 @@
       feels: document.getElementById("feels"),
       ltime: document.getElementById("ltime"),
       greeting: document.getElementById("greeting"),
+      alert: document.getElementById("alert"),
+      alertText: document.getElementById("alert-text"),
       status: document.getElementById("status"),
       refresh: document.getElementById("refresh"),
       forecast: document.getElementById("forecast"),
@@ -196,53 +356,165 @@
       btnCast: document.getElementById("btn-cast"),
       btnCopy: document.getElementById("btn-copy"),
       btnAddMiniapp: document.getElementById("btn-add-miniapp"),
-      userFid: document.getElementById("user-fid")
+      btnUnits: document.getElementById("btn-units"),
+      btnLang: document.getElementById("btn-lang"),
+      btnMap: document.getElementById("btn-map"),
+      btnAlerts: document.getElementById("btn-alerts"),
+      userFid: document.getElementById("user-fid"),
+      labelFeels: document.getElementById("label-feels"),
+      labelTime: document.getElementById("label-time"),
+      btnCastText: document.getElementById("btn-cast-text"),
+      btnCopyText: document.getElementById("btn-copy-text"),
+      btnAddText: document.getElementById("btn-add-text"),
+      mapContainer: document.getElementById("map-container"),
+      mapPlaceholder: document.getElementById("map-placeholder")
     };
 
     // Storage helpers
     const save = (k,v) => localStorage.setItem(k, JSON.stringify(v));
     const load = (k,d=null) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 
-    // UI helpers
+    // =====================================================
+    // LOCALIZATION FUNCTIONS
+    // =====================================================
+    function t(key) {
+      return TRANSLATIONS[STATE.currentLang]?.[key] || TRANSLATIONS.en[key] || key;
+    }
+
+    function updateUILanguage() {
+      els.appTitle.textContent = t("appTitle");
+      els.city.placeholder = t("searchPlaceholder");
+      els.labelFeels.textContent = t("feelsLike");
+      els.labelTime.textContent = t("localTime");
+      els.btnCastText.textContent = t("castBtn");
+      els.btnCopyText.textContent = t("copyBtn");
+      els.btnAddText.textContent = t("addBtn");
+      els.mapPlaceholder.textContent = t("mapPlaceholder");
+      
+      const langs = ['en', 'es', 'hi'];
+      const currentIdx = langs.indexOf(STATE.currentLang);
+      const nextLang = langs[(currentIdx + 1) % langs.length];
+      els.btnLang.textContent = nextLang.toUpperCase();
+    }
+
+    // =====================================================
+    // UNIT CONVERSION FUNCTIONS
+    // =====================================================
+    function convertTemp(celsius) {
+      return Math.round(UNITS.temperature[STATE.currentTempUnit].convert(celsius));
+    }
+
+    function convertSpeed(kmh) {
+      return Math.round(UNITS.speed[STATE.currentSpeedUnit].convert(kmh));
+    }
+
+    function getTempSymbol() {
+      return UNITS.temperature[STATE.currentTempUnit].symbol;
+    }
+
+    function getSpeedSymbol() {
+      return UNITS.speed[STATE.currentSpeedUnit].symbol;
+    }
+
+    function toggleUnits() {
+      if (STATE.currentTempUnit === "celsius") {
+        STATE.currentTempUnit = "fahrenheit";
+        STATE.currentSpeedUnit = "mph";
+        els.btnUnits.textContent = "°F → °C";
+      } else {
+        STATE.currentTempUnit = "celsius";
+        STATE.currentSpeedUnit = "kmh";
+        els.btnUnits.textContent = "°C → °F";
+      }
+      save("tempUnit", STATE.currentTempUnit);
+      save("speedUnit", STATE.currentSpeedUnit);
+      
+      // Re-render current weather with new units
+      const cached = load("lastWeather");
+      if (cached) render(cached.data, cached.placeName);
+    }
+
+    function toggleLanguage() {
+      const langs = ['en', 'es', 'hi'];
+      const currentIdx = langs.indexOf(STATE.currentLang);
+      STATE.currentLang = langs[(currentIdx + 1) % langs.length];
+      save("language", STATE.currentLang);
+      updateUILanguage();
+      
+      // Re-render to update greeting
+      const cached = load("lastWeather");
+      if (cached) render(cached.data, cached.placeName);
+    }
+
+    // =====================================================
+    // UI HELPERS
+    // =====================================================
     function setBackgroundByCode(code, isNight=false){
       const info = WMO[code] || WMO[2];
       document.body.className = isNight ? "bg-night" : `bg-${info.bg}`;
     }
+
     function formatTimeLocal(dateStr){
       try{ return new Date(dateStr).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }catch{return "--:--";}
     }
+
     function toast(msg){
       els.status.textContent = msg;
       setTimeout(()=> els.status.textContent = "", 2500);
     }
-    function copy(t){ 
+
+    function copy(txt){ 
       try{ 
-        navigator.clipboard.writeText(t);
-        toast("📋 Copied to clipboard!");
+        navigator.clipboard.writeText(txt);
+        toast(t("copied"));
       }catch{
         toast("Copy failed");
       } 
     }
 
-    // Adaptive greeting (time + weather)
+    // =====================================================
+    // WEATHER ALERT MODULE (Feature Flag)
+    // =====================================================
+    function checkWeatherAlert(code) {
+      if (!FEATURES.ALERTS || !STATE.alertsEnabled) {
+        els.alert.style.display = "none";
+        return;
+      }
+
+      const info = WMO[code] || WMO[2];
+      if (info.alert) {
+        els.alertText.textContent = `${info.t} - Stay safe and check local advisories`;
+        els.alert.style.display = "block";
+      } else {
+        els.alert.style.display = "none";
+      }
+    }
+
+    // =====================================================
+    // ADAPTIVE GREETING (Localized)
+    // =====================================================
     function adaptiveGreeting(code, name){
       const hr = new Date().getHours();
       const base =
-        (hr >= 6 && hr < 12) ? "☀️ Good morning" :
-        (hr >= 12 && hr < 18) ? "🌤️ Good afternoon" :
-        "🌙 Good evening";
-      let tail = " Let's build something new today.";
-      if ([0,1].includes(code)) tail = " Bright and clear — perfect day to ship!";
-      else if ([2,3,45,48].includes(code)) tail = " Cloudy skies — cozy coding weather.";
-      else if ([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code)) tail = " Rainy vibes — great time to code indoors.";
-      else if ([71,73,75,77,85,86].includes(code)) tail = " Snowy mood — warm beverage and deep focus.";
-      else if ([95,96,99].includes(code)) tail = " Stormy out — perfect to build something big inside.";
-      const msg = `${base}${name?`, ${name}`:""}!${tail}`;
+        (hr >= 6 && hr < 12) ? t("goodMorning") :
+        (hr >= 12 && hr < 18) ? t("goodAfternoon") :
+        t("goodEvening");
+      
+      let tail = t("defaultDay");
+      if ([0,1].includes(code)) tail = t("clearDay");
+      else if ([2,3,45,48].includes(code)) tail = t("cloudyDay");
+      else if ([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code)) tail = t("rainyDay");
+      else if ([71,73,75,77,85,86].includes(code)) tail = t("snowyDay");
+      else if ([95,96,99].includes(code)) tail = t("stormyDay");
+      
+      const msg = `${base}${name?`, ${name}`:""}! ${tail}`;
       els.greeting.textContent = msg;
       save("greetMsg", msg);
     }
 
-    // Relative "Updated Xm ago"
+    // =====================================================
+    // TIME TRACKING
+    // =====================================================
     let lastUpdatedTs = null;
     function setUpdatedNow(){
       lastUpdatedTs = Date.now();
@@ -255,40 +527,49 @@
       els.refresh.textContent = `Updated • ${mins}m ago`;
     }, 60000);
 
-    // Weather fetch
+    // =====================================================
+    // WEATHER FETCH
+    // =====================================================
     async function fetchWeather(lat, lon){
-      const url = `${OPEN_METEO}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code,is_day&hourly=weather_code,temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=5&timezone=auto`;
+      const days = FEATURES.EXTENDED_FORECAST ? 7 : 5;
+      const url = `${OPEN_METEO}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code,is_day&hourly=weather_code,temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=${days}&timezone=auto`;
       const res = await fetch(url, { cache:"no-store" });
       if (!res.ok) throw new Error("Weather fetch failed");
       return res.json();
     }
+
     async function geocodeCity(q){
       const url = `${GEO_CODE}?name=${encodeURIComponent(q)}&count=1&language=en&format=json`;
       const res = await fetch(url, { cache:"no-store" });
       if (!res.ok) throw new Error("City lookup failed");
       const data = await res.json();
-      if (!data.results || !data.results.length) throw new Error("City not found");
+      if (!data.results || !data.results.length) throw new Error(t("cityNotFound"));
       const r = data.results[0];
       return { name: r.name, latitude: r.latitude, longitude: r.longitude, country:r.country };
     }
 
-    // Render
+    // =====================================================
+    // RENDER WITH UNITS & LOCALIZATION
+    // =====================================================
     function render(data, placeName = "Your location"){
       try{
         const cur = data.current;
         const daily = data.daily;
         const code = cur.weather_code;
-        const info = WMO[code] || {t:"Unknown", e:"⛅", bg:"cloudy"};
+        const info = WMO[code] || {t:"Unknown", e:"⛅", bg:"cloudy", alert:false};
         const isNight = (typeof cur.is_day === "number") ? (cur.is_day === 0) : false;
 
         setBackgroundByCode(code, isNight);
         els.emoji.textContent = info.e;
-        els.temp.textContent = `${Math.round(cur.temperature_2m)}°C`;
+        els.temp.textContent = `${convertTemp(cur.temperature_2m)}${getTempSymbol()}`;
         els.cond.textContent = `${info.t} • ${placeName}`;
         els.humid.textContent = `${Math.round(cur.relative_humidity_2m)}%`;
-        els.wind.textContent = `${Math.round(cur.wind_speed_10m)} km/h`;
-        els.feels.textContent = `${Math.round(cur.apparent_temperature ?? cur.temperature_2m)}°C`;
+        els.wind.textContent = `${convertSpeed(cur.wind_speed_10m)} ${getSpeedSymbol()}`;
+        els.feels.textContent = `${convertTemp(cur.apparent_temperature ?? cur.temperature_2m)}${getTempSymbol()}`;
         els.ltime.textContent = formatTimeLocal(cur.time);
+
+        // Weather alert check
+        checkWeatherAlert(code);
 
         // Temp-change alert
         const prevTemp = load("lastTemp", null);
@@ -303,11 +584,11 @@
         // Forecast
         els.forecast.innerHTML = "";
         if (daily && daily.time && daily.time.length){
-          const days = daily.time.slice(0,5);
+          const days = daily.time;
           days.forEach((d,i)=>{
             const dcode = daily.weather_code[i];
-            const max = Math.round(daily.temperature_2m_max[i]);
-            const min = Math.round(daily.temperature_2m_min[i]);
+            const max = convertTemp(daily.temperature_2m_max[i]);
+            const min = convertTemp(daily.temperature_2m_min[i]);
             const label = new Date(d).toLocaleDateString([], { weekday:"short" });
             const dinfo = WMO[dcode] || {e:"⛅"};
             const node = document.createElement("div");
@@ -329,7 +610,7 @@
     }
 
     async function loadByCoords(lat, lon, label="Your location"){
-      els.status.textContent = "Loading weather…";
+      els.status.textContent = t("loading");
       try{
         const data = await fetchWeather(lat, lon);
         render(data, label);
@@ -337,7 +618,7 @@
         els.status.textContent = "";
       }catch(err){
         console.error(err);
-        els.status.textContent = "Offline — showing saved weather data ☁️";
+        els.status.textContent = t("offline");
         const cache = load("lastWeather");
         if (cache){ render(cache.data, cache.placeName || label); }
       }
@@ -356,7 +637,9 @@
       });
     }
 
-    // Schedules
+    // =====================================================
+    // AUTO-REFRESH
+    // =====================================================
     let lastGeo = null;
     let refreshTimer = null;
     function scheduleAutoRefresh(lat, lon, label){
@@ -368,20 +651,22 @@
       }, { once:true });
     }
 
-    // Morning greeting check + optional notifications
+    // =====================================================
+    // MORNING GREETING
+    // =====================================================
     function checkMorningGreeting(){
       const lastMsgDate = load("lastGreetDate", "");
       const today = new Date().toDateString();
       if (lastMsgDate !== today) {
-        const greetMsg = load("greetMsg", "Good morning!");
+        const greetMsg = load("greetMsg", t("goodMorning"));
         toast(greetMsg);
-        if ("Notification" in window && Notification.permission === "granted") {
+        if (FEATURES.NOTIFICATIONS && "Notification" in window && Notification.permission === "granted") {
           try { new Notification("🌤️ Daily Weather", { body: greetMsg }); } catch {}
         }
         save("lastGreetDate", today);
       }
     }
-    if ("Notification" in window && Notification.permission === "default") {
+    if (FEATURES.NOTIFICATIONS && "Notification" in window && Notification.permission === "default") {
       try { Notification.requestPermission().catch(()=>{}); } catch {}
     }
     setInterval(()=>{
@@ -389,7 +674,9 @@
       if (hr >= 6 && hr < 9) checkMorningGreeting();
     }, 60 * 60 * 1000);
 
-    // Generate weather text for sharing
+    // =====================================================
+    // SHARE FUNCTIONS
+    // =====================================================
     function getWeatherText(){
       const emoji = els.emoji.textContent;
       const temp = els.temp.textContent;
@@ -399,7 +686,6 @@
       return `${emoji} Weather Update\n\n${temp} ${cond}\n💧 ${humid} humidity • 🍃 ${wind} wind\n\nvia Weather MiniApp 🌤️`;
     }
 
-    // Cast weather using Farcaster SDK
     async function castWeather(){
       try {
         els.btnCast.disabled = true;
@@ -411,11 +697,7 @@
         });
 
         if (result?.cast) {
-          toast(`✅ Cast posted! Hash: ${result.cast.hash.slice(0,10)}...`);
-          console.log("Cast hash:", result.cast.hash);
-          if (result.cast.channelKey) {
-            console.log("Posted to channel:", result.cast.channelKey);
-          }
+          toast(`${t("castPosted")} Hash: ${result.cast.hash.slice(0,10)}...`);
         } else {
           toast("Cast cancelled");
         }
@@ -424,54 +706,70 @@
         toast("Cast failed - try copy instead");
       } finally {
         els.btnCast.disabled = false;
-        els.btnCast.textContent = "🟣 Cast Weather";
+        els.btnCast.textContent = `🟣 ${t("castBtn")}`;
       }
     }
 
-    // Copy to clipboard
     function copyWeather(){
       copy(getWeatherText());
     }
 
-    // Add MiniApp using Farcaster SDK
     async function addMiniApp(){
       try {
         els.btnAddMiniapp.disabled = true;
         els.btnAddMiniapp.textContent = "Adding...";
         
         await sdk.actions.addMiniApp();
-        toast("✅ MiniApp added!");
+        toast(t("miniappAdded"));
       } catch(err) {
         console.error("Add MiniApp error:", err);
         toast("Add MiniApp failed");
       } finally {
         els.btnAddMiniapp.disabled = false;
-        els.btnAddMiniapp.textContent = "➕ Add MiniApp";
+        els.btnAddMiniapp.textContent = `➕ ${t("addBtn")}`;
       }
     }
 
-    // Initialize Farcaster context
+    // =====================================================
+    // MAP VIEW TOGGLE (Feature Flag)
+    // =====================================================
+    function toggleMapView(){
+      STATE.mapVisible = !STATE.mapVisible;
+      els.mapContainer.style.display = STATE.mapVisible ? "flex" : "none";
+      els.btnMap.textContent = STATE.mapVisible ? "🗺️ Hide" : "🗺️ Map";
+    }
+
+    function toggleAlerts(){
+      STATE.alertsEnabled = !STATE.alertsEnabled;
+      els.btnAlerts.textContent = STATE.alertsEnabled ? "🔔 On" : "🔔 Off";
+      const cached = load("lastWeather");
+      if (cached) render(cached.data, cached.placeName);
+    }
+
+    // =====================================================
+    // FARCASTER CONTEXT
+    // =====================================================
     let farcasterUser = null;
     async function initFarcasterContext(){
       try {
-        // Try to get authenticated user via Quick Auth
         const context = await sdk.context;
         if (context?.user?.fid) {
           farcasterUser = context.user;
           els.userFid.textContent = `FID: ${farcasterUser.fid}`;
           els.userFid.style.display = "inline-flex";
-          console.log("Farcaster user:", farcasterUser);
         }
       } catch(err) {
-        console.log("No Farcaster context (running outside miniapp):", err);
+        console.log("No Farcaster context:", err);
       }
     }
 
-    // Events
+    // =====================================================
+    // EVENT HANDLERS
+    // =====================================================
     els.btnSearch.addEventListener("click", async ()=>{
       const q = els.city.value.trim();
       if (!q) return;
-      els.status.textContent = "Searching city…";
+      els.status.textContent = t("loading");
       try{
         const loc = await geocodeCity(q);
         els.city.blur();
@@ -481,30 +779,49 @@
         save("lastCity", loc);
       }catch(err){
         console.error(err);
-        els.status.textContent = "City not found";
+        els.status.textContent = t("cityNotFound");
       }
     });
+    
     els.city.addEventListener("keydown", (e)=>{ if (e.key === "Enter") els.btnSearch.click(); });
     els.btnCast.addEventListener("click", castWeather);
     els.btnCopy.addEventListener("click", copyWeather);
     els.btnAddMiniapp.addEventListener("click", addMiniApp);
+    els.btnUnits.addEventListener("click", toggleUnits);
+    els.btnLang.addEventListener("click", toggleLanguage);
+    
+    if (FEATURES.MAP_VIEW) {
+      els.btnMap.style.display = "inline-block";
+      els.btnMap.addEventListener("click", toggleMapView);
+    }
+    
+    if (FEATURES.ALERTS) {
+      els.btnAlerts.style.display = "inline-block";
+      els.btnAlerts.addEventListener("click", toggleAlerts);
+    }
+    
     els.btnMyLoc.addEventListener("click", async ()=>{
       if (lastGeo){
-        const label = "Your location";
+        const label = t("yourLocation");
         await loadByCoords(lastGeo.lat, lastGeo.lon, label);
         scheduleAutoRefresh(lastGeo.lat, lastGeo.lon, label);
       } else {
-        els.status.textContent = "Detecting location…";
+        els.status.textContent = t("detectingLocation");
         const { coords } = await initGeolocation();
         lastGeo = { lat: coords.latitude, lon: coords.longitude };
-        await loadByCoords(coords.latitude, coords.longitude, "Your location");
-        scheduleAutoRefresh(coords.latitude, coords.longitude, "Your location");
+        await loadByCoords(coords.latitude, coords.longitude, t("yourLocation"));
+        scheduleAutoRefresh(coords.latitude, coords.longitude, t("yourLocation"));
       }
     });
 
-    // Boot sequence
+    // =====================================================
+    // BOOT SEQUENCE
+    // =====================================================
     (async function boot(){
-      // Show cached data immediately
+      // Initialize UI language
+      updateUILanguage();
+      
+      // Show cached data
       const cached = load("lastWeather");
       if (cached) { render(cached.data, cached.placeName); }
 
@@ -513,23 +830,23 @@
 
       // Load weather
       const { coords, from } = await initGeolocation();
-      const label = from === "geo" ? "Your location" : `${DEFAULT_CITY.name}`;
+      const label = from === "geo" ? t("yourLocation") : `${DEFAULT_CITY.name}`;
       lastGeo = { lat: coords.latitude, lon: coords.longitude };
       await loadByCoords(coords.latitude, coords.longitude, label);
       scheduleAutoRefresh(coords.latitude, coords.longitude, label);
 
       const lastCity = load("lastCity");
-      if (lastCity) els.city.placeholder = `Try: ${lastCity.name}`;
+      if (lastCity) els.city.placeholder = `${t("searchPlaceholder").split("(")[0]}(${lastCity.name})`;
 
       const hr = new Date().getHours();
       if (hr >= 6 && hr < 9) checkMorningGreeting();
 
-      // Signal to Farcaster that app is ready
+      // Signal SDK ready
       try {
         await sdk.actions.ready();
         console.log("✅ Farcaster SDK ready");
       } catch(err) {
-        console.log("Not in Farcaster context or SDK error:", err);
+        console.log("Not in Farcaster context:", err);
       }
     })();
   </script>
