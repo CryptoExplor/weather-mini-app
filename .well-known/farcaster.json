@@ -1,11 +1,11 @@
 {
   "miniapp": {
-    "name": "Weather",
+    "name": "CastWeather",
     "version": "1",
     "iconUrl": "https://weather-base-app.vercel.app/icon.png",
     "homeUrl": "https://weather-base-app.vercel.app",
     "imageUrl": "https://weather-base-app.vercel.app/image.png",
-    "buttonTitle": "Weather",
+    "buttonTitle": "CastWeather",
     "splashImageUrl": "https://weather-base-app.vercel.app/splash.png",
     "splashBackgroundColor": "#111111",
     "webhookUrl": "https://weather-base-app.vercel.app/api/webhook",
