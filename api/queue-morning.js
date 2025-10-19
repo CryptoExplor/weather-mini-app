@@ -8,8 +8,18 @@ export default async function handler(req, res) {
   try {
     const { fid, lat, lon, label } = req.body;
 
-    // Store in a queue (e.g., list for cron to process)
-    await kv.lpush('morning_queue', JSON.stringify({ fid, lat, lon, label }));
+    if (!fid) {
+      return res.status(400).json({ error: 'Missing FID' });
+    }
+
+    // Queue for cron processing (LPUSH for FIFO)
+    await kv.lpush('morning_queue', JSON.stringify({ 
+      fid, 
+      lat: lat || null, 
+      lon: lon || null, 
+      label: label || 'Your location',
+      queuedAt: Date.now() 
+    }));
 
     res.status(200).json({ success: true });
   } catch (error) {
