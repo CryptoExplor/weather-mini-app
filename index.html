@@ -217,9 +217,19 @@
     }
     function copy(t){ 
       try{ 
-        navigator.clipboard.writeText(t);
+        // Using document.execCommand('copy') for better iFrame compatibility
+        const textarea = document.createElement('textarea');
+        textarea.value = t;
+        textarea.style.position = 'fixed'; // Prevents scrolling to bottom of page in some browsers
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+
         toast("📋 Copied to clipboard!");
-      }catch{
+      }catch(e){
+        console.error("Copy failed:", e);
         toast("Copy failed");
       } 
     }
@@ -366,13 +376,52 @@
     async function initGeolocation(){
       return new Promise((resolve)=>{
         if (!navigator.geolocation){
-          resolve({ coords: { latitude: DEFAULT_CITY.latitude, longitude: DEFAULT_CITY.longitude }, from:"fallback" }); return;
+          resolve({ coords: { latitude: DEFAULT_CITY.latitude, longitude: DEFAULT_CITY.longitude }, from:"fallback" }); 
+          return;
         }
+        
+        // --- START GEOLOCATION FIX ---
+        // Applying the improved settings: high accuracy, increased timeout, and reduced max age.
+        const GEOLOCATION_OPTIONS = {
+          enableHighAccuracy: true,  // Use GPS for better accuracy
+          timeout: 15000,            // Increased from 8s to 15s
+          maximumAge: 60000          // Reduced from 5min (300000ms) to 1min
+        };
+
+        const errorCallback = (err) => {
+          // Detailed Error Logging
+          console.error("❌ Geolocation error:", err.code, err.message);
+          let userTip = "";
+
+          if (err.code === 1) {
+            console.log("User denied location permission");
+            userTip = "User denied location permission. Showing default location.";
+          } else if (err.code === 2) {
+            console.log("Location unavailable");
+            userTip = "Location unavailable. Showing default location.";
+          } else if (err.code === 3) {
+            console.log("Location timeout (15s exceeded)");
+            userTip = "Location timed out. Showing default location.";
+          } else {
+            userTip = "Location failed. Showing default location.";
+          }
+          
+          // Better User Feedback
+          toast("💡 Tip: Enable location permission for your local weather");
+          els.status.textContent = userTip;
+          
+          resolve({ coords: { latitude: DEFAULT_CITY.latitude, longitude: DEFAULT_CITY.longitude }, from:"fallback" });
+        };
+
         navigator.geolocation.getCurrentPosition(
-          (pos)=> resolve({ coords: pos.coords, from:"geo" }),
-          ()=> resolve({ coords: { latitude: DEFAULT_CITY.latitude, longitude: DEFAULT_CITY.longitude }, from:"fallback" }),
-          { enableHighAccuracy:false, timeout:8000, maximumAge:300000 }
+          (pos) => {
+            console.log("✅ Location obtained successfully");
+            resolve({ coords: pos.coords, from:"geo" });
+          },
+          errorCallback,
+          GEOLOCATION_OPTIONS
         );
+        // --- END GEOLOCATION FIX ---
       });
     }
 
@@ -530,10 +579,12 @@
       const { coords, from } = await initGeolocation();
       let label;
       if (from === 'geo') {
+        // Only attempt reverse geocoding if location was actually obtained via GPS
         label = await reverseGeocode(coords.latitude, coords.longitude);
       } else {
+        // This label is set when falling back
         label = `${DEFAULT_CITY.name} (default)`;
-        els.status.textContent = "Location off. Showing default.";
+        // NOTE: els.status.textContent is handled within initGeolocation errorCallback for better feedback
       }
       
       lastGeo = { lat: coords.latitude, lon: coords.longitude };
