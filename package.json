@@ -1,0 +1,20 @@
+{
+  "name": "weather-mini-app",
+  "version": "1.0.0",
+  "description": "CastWeather: A Farcaster MiniApp for live weather, forecasts, and notifications",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'No build step required'",
+    "deploy": "vercel deploy"
+  },
+  "dependencies": {
+    "@farcaster/core": "^0.18.6",
+    "@vercel/kv": "^1.1.0"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}
