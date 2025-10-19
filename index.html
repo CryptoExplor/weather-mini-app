@@ -92,6 +92,34 @@
     .bg-rainy{ background: linear-gradient(160deg, #1e3a8a 0%, #1e40af 60%, #111827 120%) fixed; }
     .bg-night{ background: linear-gradient(160deg, #2e1065 0%, #581c87 60%, #111827 120%) fixed; }
     @media (prefers-reduced-motion: reduce){ *{ transition:none !important; animation:none !important; } }
+
+    /* Modal styles */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+    }
+    .modal-content {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-bd);
+      border-radius: var(--radius);
+      margin: 20% auto;
+      padding: 20px;
+      width: 90%;
+      max-width: 300px;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    }
+    .modal h3 { margin: 0 0 10px; color: var(--text); }
+    .modal p { margin: 0 0 15px; color: var(--muted); font-size: 14px; }
+    .modal button { margin: 0 5px; padding: 8px 16px; }
+    .close { background: transparent; border: 1px solid var(--glass-bd); color: var(--text); }
   </style>
 </head>
 <body class="bg-night">
@@ -155,6 +183,16 @@
     </div>
   </div>
 
+  <!-- Location Permission Modal -->
+  <div id="locationModal" class="modal">
+    <div class="modal-content">
+      <h3>📍 Enable Location Access</h3>
+      <p>To get accurate weather for your area, please allow location access in your browser settings. This uses your device's GPS or nearby cell towers/WiFi for precision.</p>
+      <button id="retryLocation" class="ghost">Retry Location</button>
+      <button id="useIP" class="close">Use Approximate Location</button>
+    </div>
+  </div>
+
   <script type="module">
     import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
 
@@ -196,7 +234,10 @@
       btnCast: document.getElementById("btn-cast"),
       btnCopy: document.getElementById("btn-copy"),
       btnAddMiniapp: document.getElementById("btn-add-miniapp"),
-      userFid: document.getElementById("user-fid")
+      userFid: document.getElementById("user-fid"),
+      locationModal: document.getElementById("locationModal"),
+      retryLocation: document.getElementById("retryLocation"),
+      useIP: document.getElementById("useIP")
     };
 
     // Storage helpers
@@ -229,6 +270,14 @@
         console.error("Copy failed:", e);
         toast("Copy failed");
       } 
+    }
+
+    // Show/hide modal
+    function showLocationModal() {
+      els.locationModal.style.display = "block";
+    }
+    function hideLocationModal() {
+      els.locationModal.style.display = "none";
     }
 
     // Adaptive greeting (time + weather)
@@ -350,41 +399,72 @@
       }
     }
 
-    // Improved geolocation with IP fallback
-    async function initGeolocation(){
-      if (!navigator.geolocation){
-        toast("📍 Geolocation not supported");
+    // IP-based location fallback
+    async function getIPLocation() {
+      try {
+        const res = await fetch('https://ipapi.co/json/');
+        if (!res.ok) throw new Error("IP fetch failed");
+        const data = await res.json();
+        if (data.error) throw new Error(data.reason);
+        if (data.latitude && data.longitude) {
+          const label = data.city ? `${data.city}${data.region ? `, ${data.region}` : ''}, ${data.country_name || data.country}`.trim() : "Your approximate location";
+          return { lat: parseFloat(data.latitude), lon: parseFloat(data.longitude), label, from:"ip" };
+        } else {
+          throw new Error("No coords in IP data");
+        }
+      } catch(err) {
+        console.warn("IP lookup failed:", err);
         return { lat: DEFAULT_CITY.latitude, lon: DEFAULT_CITY.longitude, label: DEFAULT_CITY.name, from:"fallback" };
+      }
+    }
+
+    // Improved geolocation with GPS first, then network (cell/WiFi), then IP
+    async function getGeoLocation(accuracy = 'high') {
+      const options = {
+        timeout: 15000,
+        maximumAge: 0,
+        enableHighAccuracy: accuracy === 'high'
+      };
+      return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+      });
+    }
+
+    async function initGeolocation() {
+      if (!navigator.geolocation) {
+        toast("📍 Geolocation not supported");
+        return await getIPLocation();
       }
 
       try {
-        const pos = await new Promise((res, rej)=>{
-          navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy:true, timeout:15000, maximumAge:0 });
-        });
-        console.log("✅ Live location detected:", pos.coords);
-        toast("📍 Using your live location");
-        return { lat: pos.coords.latitude, lon: pos.coords.longitude, label: "Your location", from:"geo" };
-      } catch(err){
-        console.warn("⚠️ Geolocation error:", err.message);
-        toast("⚠️ Location access denied — trying IP lookup");
-        // Try IP-based location as fallback
+        // First try high accuracy (GPS)
+        const pos = await getGeoLocation('high');
+        console.log("✅ GPS location detected:", pos.coords);
+        toast("📍 Using GPS location");
+        return { lat: pos.coords.latitude, lon: pos.coords.longitude, label: "Your location", from:"gps" };
+      } catch(err) {
+        console.warn("⚠️ GPS error:", err);
+        if (err.code === 1) { // PERMISSION_DENIED
+          toast("⚠️ Location permission denied");
+          showLocationModal();
+          throw err; // Let caller handle modal
+        }
+
         try {
-          const res = await fetch('https://ipapi.co/json/');
-          if (!res.ok) throw new Error("IP fetch failed");
-          const data = await res.json();
-          if (data.error) throw new Error(data.reason);
-          if (data.latitude && data.longitude) {
-            const label = data.city ? `${data.city}${data.region ? `, ${data.region}` : ''}, ${data.country_name || data.country}`.trim() : "Your approximate location";
-            console.log("📍 IP location:", data);
-            toast("📍 Using IP-based location");
-            return { lat: parseFloat(data.latitude), lon: parseFloat(data.longitude), label, from:"ip" };
-          } else {
-            throw new Error("No coords in IP data");
+          // Fallback to network accuracy (cell tower/WiFi)
+          const pos = await getGeoLocation('low');
+          console.log("✅ Network location (cell/WiFi) detected:", pos.coords);
+          toast("📍 Using nearby cell tower/WiFi location");
+          return { lat: pos.coords.latitude, lon: pos.coords.longitude, label: "Your approximate location", from:"network" };
+        } catch(netErr) {
+          console.warn("⚠️ Network location error:", netErr);
+          if (netErr.code === 1) { // Also denied
+            toast("⚠️ Location permission denied");
+            showLocationModal();
+            throw netErr;
           }
-        } catch(ipErr){
-          console.warn("IP lookup failed:", ipErr);
-          toast("⚠️ IP lookup failed — using default city");
-          return { lat: DEFAULT_CITY.latitude, lon: DEFAULT_CITY.longitude, label: DEFAULT_CITY.name, from:"fallback" };
+          // Final fallback to IP
+          return await getIPLocation();
         }
       }
     }
@@ -524,16 +604,63 @@
 
     // 📍 button logic
     els.btnMyLoc.addEventListener("click", async ()=>{
-      els.status.textContent = "📍 Detecting your location…";
-      const { lat, lon, label, from } = await initGeolocation();
-      lastGeo = { lat, lon };
-      await loadByCoords(lat, lon, label);
-      scheduleAutoRefresh(lat, lon, label);
-      els.status.textContent = from === "geo" 
-        ? "✅ Live GPS location loaded"
-        : from === "ip" 
-        ? "📍 IP-based location loaded"
-        : "⚠️ Using default city";
+      try {
+        els.status.textContent = "📍 Detecting your location…";
+        const { lat, lon, label, from } = await initGeolocation();
+        lastGeo = { lat, lon };
+        await loadByCoords(lat, lon, label);
+        scheduleAutoRefresh(lat, lon, label);
+        els.status.textContent = from === "gps" 
+          ? "✅ GPS location loaded"
+          : from === "network" 
+          ? "📍 Network (cell/WiFi) location loaded"
+          : from === "ip" 
+          ? "📍 IP-based location loaded"
+          : "⚠️ Using default city";
+      } catch(err) {
+        // Modal is shown in initGeolocation on denial
+        console.warn("Location denied, modal shown");
+      }
+    });
+
+    // Modal events
+    els.retryLocation.addEventListener("click", async () => {
+      hideLocationModal();
+      els.status.textContent = "📍 Retrying GPS location…";
+      try {
+        const { lat, lon, label, from } = await initGeolocation();
+        lastGeo = { lat, lon };
+        await loadByCoords(lat, lon, label);
+        scheduleAutoRefresh(lat, lon, label);
+        els.status.textContent = from === "gps" 
+          ? "✅ GPS location loaded"
+          : from === "network" 
+          ? "📍 Network location loaded"
+          : "⚠️ Still unable to get location";
+      } catch(retryErr) {
+        // If retry also denied, keep modal or fallback
+        if (retryErr.code === 1) {
+          showLocationModal();
+        } else {
+          // Fallback to IP
+          els.status.textContent = "📍 Falling back to IP location…";
+          const ipLoc = await getIPLocation();
+          lastGeo = { lat: ipLoc.lat, lon: ipLoc.lon };
+          await loadByCoords(ipLoc.lat, ipLoc.lon, ipLoc.label);
+          scheduleAutoRefresh(ipLoc.lat, ipLoc.lon, ipLoc.label);
+          els.status.textContent = "📍 IP-based location loaded";
+        }
+      }
+    });
+
+    els.useIP.addEventListener("click", async () => {
+      hideLocationModal();
+      els.status.textContent = "📍 Using approximate IP location…";
+      const ipLoc = await getIPLocation();
+      lastGeo = { lat: ipLoc.lat, lon: ipLoc.lon };
+      await loadByCoords(ipLoc.lat, ipLoc.lon, ipLoc.label);
+      scheduleAutoRefresh(ipLoc.lat, ipLoc.lon, ipLoc.label);
+      els.status.textContent = ipLoc.from === "ip" ? "📍 IP-based location loaded" : "⚠️ Using default city";
     });
 
     // Boot sequence
@@ -548,17 +675,34 @@
       await initFarcasterContext();
 
       // Load initial weather
-      const { lat, lon, label, from } = await initGeolocation();
-      lastGeo = { lat, lon };
-      await loadByCoords(lat, lon, label);
-      scheduleAutoRefresh(lat, lon, label);
-      
-      // Update status to reflect boot result
-      els.status.textContent = from === "geo" 
-        ? "✅ Live GPS location loaded"
-        : from === "ip" 
-        ? "📍 IP-based location loaded"
-        : "⚠️ Using default city (location unavailable)";
+      try {
+        const { lat, lon, label, from } = await initGeolocation();
+        lastGeo = { lat, lon };
+        await loadByCoords(lat, lon, label);
+        scheduleAutoRefresh(lat, lon, label);
+        
+        // Update status to reflect boot result
+        els.status.textContent = from === "gps" 
+          ? "✅ GPS location loaded"
+          : from === "network" 
+          ? "📍 Network (cell/WiFi) location loaded"
+          : from === "ip" 
+          ? "📍 IP-based location loaded"
+          : "⚠️ Using default city (location unavailable)";
+      } catch(err) {
+        // On denial during boot, show modal
+        if (err.code === 1) {
+          els.status.textContent = "⚠️ Location permission needed for accurate weather";
+          // Proceed with IP fallback after short delay
+          setTimeout(async () => {
+            const ipLoc = await getIPLocation();
+            lastGeo = { lat: ipLoc.lat, lon: ipLoc.lon };
+            await loadByCoords(ipLoc.lat, ipLoc.lon, ipLoc.label);
+            scheduleAutoRefresh(ipLoc.lat, ipLoc.lon, ipLoc.label);
+            els.status.textContent = ipLoc.from === "ip" ? "📍 IP-based location loaded" : "⚠️ Using default city";
+          }, 1000);
+        }
+      }
 
       const lastCity = load("lastCity");
       if (lastCity) els.city.placeholder = `Try: ${lastCity.name}`;
