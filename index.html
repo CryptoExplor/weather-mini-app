@@ -24,7 +24,8 @@
         "splashImageUrl":"https://weather-base-app.vercel.app/splash.png",
         "splashBackgroundColor":"#111111"
       }
-    }
+    },
+    "webhookUrl": "https://weather-base-app.vercel.app/api/webhook"
   }' />
   
   <!-- Open Graph -->
@@ -186,8 +187,7 @@
   <!-- Location Permission Modal -->
   <div id="locationModal" class="modal">
     <div class="modal-content">
-      <h3>📍 Enable Location Access</h3>
-      <h3 id="modal-title">Enable Location Access</h3>
+      <h3 id="modal-title">📍 Enable Location Access</h3>
       <p id="modal-message">To get accurate weather for your area, please allow location access in your browser settings. This uses your device's GPS or nearby cell towers/WiFi for precision.</p>
       <button id="retryLocation" class="ghost">Retry Location</button>
       <button id="useIP" class="close">Use Approximate Location</button>
@@ -206,7 +206,7 @@
     const WMO = {
       0:{t:"Clear sky",e:"☀️",bg:"sunny"}, 1:{t:"Mainly clear",e:"🌤️",bg:"sunny"}, 2:{t:"Partly cloudy",e:"⛅",bg:"cloudy"}, 3:{t:"Overcast",e:"☁️",bg:"cloudy"},
       45:{t:"Fog",e:"🌫️",bg:"cloudy"}, 48:{t:"Depositing rime fog",e:"🌫️",bg:"cloudy"},
-      51:{t:"Light drizzle",e:"🌦️",bg:"rainy"}, 53:{t:"Moderate drizzle",e:"🌦️",bg:"rainy"}, 55:{t:"Dense drizzle",e:"🌧️",bg:"rainy"},
+      51:{t:"Light drizzle",e:"🌦️",bg:"rainy"}, 53:{t:"Moderate drizzle",e:"🌦️",bg:"rainny"}, 55:{t:"Dense drizzle",e:"🌧️",bg:"rainy"},
       56:{t:"Freezing drizzle: light",e:"🌧️",bg:"rainy"}, 57:{t:"Freezing drizzle: dense",e:"🌧️",bg:"rainy"},
       61:{t:"Slight rain",e:"🌧️",bg:"rainy"}, 63:{t:"Moderate rain",e:"🌧️",bg:"rainy"}, 65:{t:"Heavy rain",e:"🌧️",bg:"rainy"},
       66:{t:"Freezing rain: light",e:"🌧️",bg:"rainy"}, 67:{t:"Freezing rain: heavy",e:"🌧️",bg:"rainy"},
@@ -301,6 +301,17 @@
       const msg = `${base}${name?`, ${name}`:""}!${tail}`;
       els.greeting.textContent = msg;
       save("greetMsg", msg);
+    }
+
+    // Handle notification open
+    function handleNotificationContext(context) {
+      if (context.location && context.location.type === 'notification') {
+        const notif = context.location.notification;
+        toast(`🔔 Opened from notification: ${notif.title} - ${notif.body}`);
+        // Optionally, set greeting or update UI based on notification
+        els.greeting.textContent = `${notif.body} Thanks for checking in! 🌤️`;
+        console.log('Notification context:', notif);
+      }
     }
 
     // Relative "Updated Xm ago"
@@ -516,8 +527,8 @@
       }, { once:true });
     }
 
-    // Morning greeting check + optional notifications
-    function checkMorningGreeting(){
+    // Morning greeting check + optional notifications (now Farcaster-aware)
+    async function checkMorningGreeting(farcasterContext = null) {
       const lastMsgDate = load("lastGreetDate", "");
       const today = new Date().toDateString();
       if (lastMsgDate !== today) {
@@ -525,6 +536,12 @@
         toast(greetMsg);
         if ("Notification" in window && Notification.permission === "granted") {
           try { new Notification("🌤️ Daily Weather", { body: greetMsg }); } catch {}
+        }
+        // If in Farcaster and user added app, could trigger server-side notification, but requires backend
+        if (farcasterContext?.user?.fid) {
+          console.log("Farcaster user eligible for push notification:", farcasterContext.user.fid);
+          // TODO: Call server endpoint to queue daily notification for this FID
+          // e.g., fetch('/api/send-morning-notification', { method: 'POST', body: JSON.stringify({ fid: farcasterContext.user.fid, message: greetMsg }) });
         }
         save("lastGreetDate", today);
       }
@@ -588,7 +605,7 @@
         els.btnAddMiniapp.textContent = "Adding...";
         
         await sdk.actions.addMiniApp();
-        toast("✅ MiniApp added!");
+        toast("✅ MiniApp added! Notifications enabled.");
       } catch(err) {
         console.error("Add MiniApp error:", err);
         toast("Add MiniApp failed");
@@ -600,15 +617,18 @@
 
     // Initialize Farcaster context
     let farcasterUser = null;
+    let farcasterContext = null;
     async function initFarcasterContext(){
       try {
         // Try to get authenticated user via Quick Auth
-        const context = await sdk.context;
-        if (context?.user?.fid) {
-          farcasterUser = context.user;
+        farcasterContext = await sdk.context;
+        if (farcasterContext?.user?.fid) {
+          farcasterUser = farcasterContext.user;
           els.userFid.textContent = `FID: ${farcasterUser.fid}`;
           els.userFid.style.display = "inline-flex";
           console.log("Farcaster user:", farcasterUser);
+          // Handle if opened from notification
+          handleNotificationContext(farcasterContext);
         }
       } catch(err) {
         console.log("No Farcaster context (running outside miniapp):", err);
@@ -755,7 +775,7 @@
       if (lastCity) els.city.placeholder = `Try: ${lastCity.name}`;
 
       const hr = new Date().getHours();
-      if (hr >= 6 && hr < 9) checkMorningGreeting();
+      if (hr >= 6 && hr < 9) checkMorningGreeting(farcasterContext);
 
       // Signal to Farcaster that app is ready
       try {
