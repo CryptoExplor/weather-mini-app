@@ -206,7 +206,7 @@
     const WMO = {
       0:{t:"Clear sky",e:"☀️",bg:"sunny"}, 1:{t:"Mainly clear",e:"🌤️",bg:"sunny"}, 2:{t:"Partly cloudy",e:"⛅",bg:"cloudy"}, 3:{t:"Overcast",e:"☁️",bg:"cloudy"},
       45:{t:"Fog",e:"🌫️",bg:"cloudy"}, 48:{t:"Depositing rime fog",e:"🌫️",bg:"cloudy"},
-      51:{t:"Light drizzle",e:"🌦️",bg:"rainy"}, 53:{t:"Moderate drizzle",e:"🌦️",bg:"rainny"}, 55:{t:"Dense drizzle",e:"🌧️",bg:"rainy"},
+      51:{t:"Light drizzle",e:"🌦️",bg:"rainy"}, 53:{t:"Moderate drizzle",e:"🌦️",bg:"rainy"}, 55:{t:"Dense drizzle",e:"🌧️",bg:"rainy"},
       56:{t:"Freezing drizzle: light",e:"🌧️",bg:"rainy"}, 57:{t:"Freezing drizzle: dense",e:"🌧️",bg:"rainy"},
       61:{t:"Slight rain",e:"🌧️",bg:"rainy"}, 63:{t:"Moderate rain",e:"🌧️",bg:"rainy"}, 65:{t:"Heavy rain",e:"🌧️",bg:"rainy"},
       66:{t:"Freezing rain: light",e:"🌧️",bg:"rainy"}, 67:{t:"Freezing rain: heavy",e:"🌧️",bg:"rainy"},
@@ -283,6 +283,25 @@
     }
     function hideLocationModal() {
       els.locationModal.style.display = "none";
+    }
+
+    // Register location with server for notifications
+    async function registerLocation(fid, lat, lon, label) {
+      if (!fid) return;
+      try {
+        const res = await fetch('/api/register-location', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fid, lat, lon, label })
+        });
+        if (res.ok) {
+          console.log('✅ Location registered for notifications');
+        } else {
+          console.warn('Location registration failed');
+        }
+      } catch (err) {
+        console.error('Register location error:', err);
+      }
     }
 
     // Adaptive greeting (time + weather)
@@ -537,11 +556,23 @@
         if ("Notification" in window && Notification.permission === "granted") {
           try { new Notification("🌤️ Daily Weather", { body: greetMsg }); } catch {}
         }
-        // If in Farcaster and user added app, could trigger server-side notification, but requires backend
-        if (farcasterContext?.user?.fid) {
-          console.log("Farcaster user eligible for push notification:", farcasterContext.user.fid);
-          // TODO: Call server endpoint to queue daily notification for this FID
-          // e.g., fetch('/api/send-morning-notification', { method: 'POST', body: JSON.stringify({ fid: farcasterContext.user.fid, message: greetMsg }) });
+        // If in Farcaster and user added app, queue server-side notification
+        if (farcasterContext?.user?.fid && lastGeo) {
+          try {
+            await fetch('/api/queue-morning', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                fid: farcasterContext.user.fid, 
+                lat: lastGeo.lat, 
+                lon: lastGeo.lon, 
+                label: lastGeo.label || "Your location" 
+              })
+            });
+            console.log("✅ Morning notification queued");
+          } catch (err) {
+            console.error("Queue morning error:", err);
+          }
         }
         save("lastGreetDate", today);
       }
@@ -647,6 +678,10 @@
         await loadByCoords(loc.latitude, loc.longitude, label);
         scheduleAutoRefresh(loc.latitude, loc.longitude, label);
         save("lastCity", loc);
+        // Register updated location if Farcaster user
+        if (farcasterUser) {
+          registerLocation(farcasterUser.fid, loc.latitude, loc.longitude, label);
+        }
       }catch(err){
         console.error(err);
         els.status.textContent = "City not found";
@@ -662,7 +697,7 @@
       try {
         els.status.textContent = "📍 Detecting your location…";
         const { lat, lon, label, from } = await initGeolocation();
-        lastGeo = { lat, lon };
+        lastGeo = { lat, lon, label };
         await loadByCoords(lat, lon, label);
         scheduleAutoRefresh(lat, lon, label);
         els.status.textContent = from === "gps" 
@@ -672,6 +707,10 @@
           : from === "ip" 
           ? "📍 IP-based location loaded"
           : "⚠️ Using default city";
+        // Register location if Farcaster user
+        if (farcasterUser) {
+          registerLocation(farcasterUser.fid, lat, lon, label);
+        }
       } catch(err) {
         // Modal is shown in initGeolocation on denial
         console.warn("Location denied, modal shown");
@@ -684,7 +723,7 @@
       els.status.textContent = "📍 Retrying GPS location…";
       try {
         const { lat, lon, label, from } = await initGeolocation();
-        lastGeo = { lat, lon };
+        lastGeo = { lat, lon, label };
         await loadByCoords(lat, lon, label);
         scheduleAutoRefresh(lat, lon, label);
         els.status.textContent = from === "gps" 
@@ -692,6 +731,9 @@
           : from === "network" 
           ? "📍 Network location loaded"
           : "⚠️ Still unable to get location";
+        if (farcasterUser) {
+          registerLocation(farcasterUser.fid, lat, lon, label);
+        }
       } catch(retryErr) {
         // If retry also denied, keep modal or fallback
         if (retryErr.code === 1) {
@@ -701,10 +743,13 @@
           // Fallback to IP for other errors
           els.status.textContent = "📍 Falling back to IP location…";
           const ipLoc = await getIPLocation();
-          lastGeo = { lat: ipLoc.lat, lon: ipLoc.lon };
+          lastGeo = { lat: ipLoc.lat, lon: ipLoc.lon, label: ipLoc.label };
           await loadByCoords(ipLoc.lat, ipLoc.lon, ipLoc.label);
           scheduleAutoRefresh(ipLoc.lat, ipLoc.lon, ipLoc.label);
           els.status.textContent = "📍 IP-based location loaded";
+          if (farcasterUser) {
+            registerLocation(farcasterUser.fid, ipLoc.lat, ipLoc.lon, ipLoc.label);
+          }
         }
       }
     });
@@ -713,10 +758,13 @@
       hideLocationModal();
       els.status.textContent = "📍 Using approximate IP location…";
       const ipLoc = await getIPLocation();
-      lastGeo = { lat: ipLoc.lat, lon: ipLoc.lon };
+      lastGeo = { lat: ipLoc.lat, lon: ipLoc.lon, label: ipLoc.label };
       await loadByCoords(ipLoc.lat, ipLoc.lon, ipLoc.label);
       scheduleAutoRefresh(ipLoc.lat, ipLoc.lon, ipLoc.label);
       els.status.textContent = ipLoc.from === "ip" ? "📍 IP-based location loaded" : "⚠️ Using default city";
+      if (farcasterUser) {
+        registerLocation(farcasterUser.fid, ipLoc.lat, ipLoc.lon, ipLoc.label);
+      }
     });
 
     // Boot sequence
@@ -733,7 +781,7 @@
       // Load initial weather
       try {
         const { lat, lon, label, from } = await initGeolocation();
-        lastGeo = { lat, lon };
+        lastGeo = { lat, lon, label };
         await loadByCoords(lat, lon, label);
         scheduleAutoRefresh(lat, lon, label);
         
@@ -745,6 +793,10 @@
           : from === "ip" 
           ? "📍 IP-based location loaded"
           : "⚠️ Using default city (location unavailable)";
+        // Register initial location if Farcaster user
+        if (farcasterUser) {
+          registerLocation(farcasterUser.fid, lat, lon, label);
+        }
       } catch(err) {
         // On denial during boot, show modal
         if (err.code === 1) {
@@ -754,20 +806,26 @@
           // Proceed with IP fallback after short delay
           setTimeout(async () => {
             const ipLoc = await getIPLocation();
-            lastGeo = { lat: ipLoc.lat, lon: ipLoc.lon };
+            lastGeo = { lat: ipLoc.lat, lon: ipLoc.lon, label: ipLoc.label };
             await loadByCoords(ipLoc.lat, ipLoc.lon, ipLoc.label);
             scheduleAutoRefresh(ipLoc.lat, ipLoc.lon, ipLoc.label);
             els.status.textContent = ipLoc.from === "ip" ? "📍 IP-based location loaded" : "⚠️ Using default city";
+            if (farcasterUser) {
+              registerLocation(farcasterUser.fid, ipLoc.lat, ipLoc.lon, ipLoc.label);
+            }
           }, 1000);
         } else {
           // For other errors, fallback to IP
           const errorInfo = getGeolocationErrorMessage(err.code || 0, err.message || "Unknown error");
           toast(errorInfo.message);
           const ipLoc = await getIPLocation();
-          lastGeo = { lat: ipLoc.lat, lon: ipLoc.lon };
+          lastGeo = { lat: ipLoc.lat, lon: ipLoc.lon, label: ipLoc.label };
           await loadByCoords(ipLoc.lat, ipLoc.lon, ipLoc.label);
           scheduleAutoRefresh(ipLoc.lat, ipLoc.lon, ipLoc.label);
           els.status.textContent = ipLoc.from === "ip" ? "📍 IP-based location loaded" : "⚠️ Using default city";
+          if (farcasterUser) {
+            registerLocation(farcasterUser.fid, ipLoc.lat, ipLoc.lon, ipLoc.label);
+          }
         }
       }
 
