@@ -11,5 +11,6 @@
       "path": "/api/daily-notifications",
       "schedule": "0 5 * * *"
     }
-  ]
+  ],
+  "outputDirectory": "."
 }
