@@ -187,7 +187,8 @@
   <div id="locationModal" class="modal">
     <div class="modal-content">
       <h3>📍 Enable Location Access</h3>
-      <p>To get accurate weather for your area, please allow location access in your browser settings. This uses your device's GPS or nearby cell towers/WiFi for precision.</p>
+      <h3 id="modal-title">Enable Location Access</h3>
+      <p id="modal-message">To get accurate weather for your area, please allow location access in your browser settings. This uses your device's GPS or nearby cell towers/WiFi for precision.</p>
       <button id="retryLocation" class="ghost">Retry Location</button>
       <button id="useIP" class="close">Use Approximate Location</button>
     </div>
@@ -236,6 +237,8 @@
       btnAddMiniapp: document.getElementById("btn-add-miniapp"),
       userFid: document.getElementById("user-fid"),
       locationModal: document.getElementById("locationModal"),
+      modalTitle: document.getElementById("modal-title"),
+      modalMessage: document.getElementById("modal-message"),
       retryLocation: document.getElementById("retryLocation"),
       useIP: document.getElementById("useIP")
     };
@@ -273,7 +276,9 @@
     }
 
     // Show/hide modal
-    function showLocationModal() {
+    function showLocationModal(title = "Enable Location Access", message = "To get accurate weather for your area, please allow location access in your browser settings. This uses your device's GPS or nearby cell towers/WiFi for precision.") {
+      els.modalTitle.textContent = title;
+      els.modalMessage.textContent = message;
       els.locationModal.style.display = "block";
     }
     function hideLocationModal() {
@@ -418,6 +423,32 @@
       }
     }
 
+    // Geolocation error messages
+    function getGeolocationErrorMessage(code, message) {
+      switch (code) {
+        case 1:
+          return {
+            title: "📍 Location Permission Denied",
+            message: "You denied location access. Please enable it in your browser settings for accurate local weather."
+          };
+        case 2:
+          return {
+            title: "📍 Location Unavailable",
+            message: "Unable to determine your location. This could be due to no GPS signal or device issues. Trying approximate location."
+          };
+        case 3:
+          return {
+            title: "📍 Location Timeout",
+            message: "Location request timed out. Please check your connection or try again. Falling back to approximate location."
+          };
+        default:
+          return {
+            title: "📍 Location Error",
+            message: `An error occurred: ${message}. Falling back to approximate location.`
+          };
+      }
+    }
+
     // Improved geolocation with GPS first, then network (cell/WiFi), then IP
     async function getGeoLocation(accuracy = 'high') {
       const options = {
@@ -426,7 +457,9 @@
         enableHighAccuracy: accuracy === 'high'
       };
       return new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+        navigator.geolocation.getCurrentPosition(resolve, (error) => {
+          reject(error);
+        }, options);
       });
     }
 
@@ -437,33 +470,35 @@
       }
 
       try {
-        // First try high accuracy (GPS)
+        // 1st: GPS (high accuracy)
         const pos = await getGeoLocation('high');
         console.log("✅ GPS location detected:", pos.coords);
         toast("📍 Using GPS location");
         return { lat: pos.coords.latitude, lon: pos.coords.longitude, label: "Your location", from:"gps" };
       } catch(err) {
+        let errorInfo = getGeolocationErrorMessage(err.code, err.message);
         console.warn("⚠️ GPS error:", err);
         if (err.code === 1) { // PERMISSION_DENIED
           toast("⚠️ Location permission denied");
-          showLocationModal();
+          showLocationModal(errorInfo.title, errorInfo.message);
           throw err; // Let caller handle modal
         }
 
         try {
-          // Fallback to network accuracy (cell tower/WiFi)
+          // 2nd: Network (cell tower/WiFi, low accuracy)
           const pos = await getGeoLocation('low');
           console.log("✅ Network location (cell/WiFi) detected:", pos.coords);
           toast("📍 Using nearby cell tower/WiFi location");
           return { lat: pos.coords.latitude, lon: pos.coords.longitude, label: "Your approximate location", from:"network" };
         } catch(netErr) {
+          let netErrorInfo = getGeolocationErrorMessage(netErr.code, netErr.message);
           console.warn("⚠️ Network location error:", netErr);
           if (netErr.code === 1) { // Also denied
             toast("⚠️ Location permission denied");
-            showLocationModal();
+            showLocationModal(netErrorInfo.title, netErrorInfo.message);
             throw netErr;
           }
-          // Final fallback to IP
+          // 3rd: IP
           return await getIPLocation();
         }
       }
@@ -640,9 +675,10 @@
       } catch(retryErr) {
         // If retry also denied, keep modal or fallback
         if (retryErr.code === 1) {
-          showLocationModal();
+          const errorInfo = getGeolocationErrorMessage(retryErr.code, retryErr.message);
+          showLocationModal(errorInfo.title, errorInfo.message);
         } else {
-          // Fallback to IP
+          // Fallback to IP for other errors
           els.status.textContent = "📍 Falling back to IP location…";
           const ipLoc = await getIPLocation();
           lastGeo = { lat: ipLoc.lat, lon: ipLoc.lon };
@@ -692,7 +728,9 @@
       } catch(err) {
         // On denial during boot, show modal
         if (err.code === 1) {
+          const errorInfo = getGeolocationErrorMessage(err.code, err.message);
           els.status.textContent = "⚠️ Location permission needed for accurate weather";
+          showLocationModal(errorInfo.title, errorInfo.message);
           // Proceed with IP fallback after short delay
           setTimeout(async () => {
             const ipLoc = await getIPLocation();
@@ -701,6 +739,15 @@
             scheduleAutoRefresh(ipLoc.lat, ipLoc.lon, ipLoc.label);
             els.status.textContent = ipLoc.from === "ip" ? "📍 IP-based location loaded" : "⚠️ Using default city";
           }, 1000);
+        } else {
+          // For other errors, fallback to IP
+          const errorInfo = getGeolocationErrorMessage(err.code || 0, err.message || "Unknown error");
+          toast(errorInfo.message);
+          const ipLoc = await getIPLocation();
+          lastGeo = { lat: ipLoc.lat, lon: ipLoc.lon };
+          await loadByCoords(ipLoc.lat, ipLoc.lon, ipLoc.label);
+          scheduleAutoRefresh(ipLoc.lat, ipLoc.lon, ipLoc.label);
+          els.status.textContent = ipLoc.from === "ip" ? "📍 IP-based location loaded" : "⚠️ Using default city";
         }
       }
 
