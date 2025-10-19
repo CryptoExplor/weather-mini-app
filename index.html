@@ -28,7 +28,7 @@
   }' />
   
   <!-- Open Graph -->
-  <meta property="og:title" content="CastWeather • Farcaster MiniApp" />
+  <meta property="og:title" content="Weather • Farcaster MiniApp" />
   <meta property="og:description" content="Get live weather, daily forecasts, and adaptive greetings right inside Farcaster." />
   <meta property="og:image" content="https://weather-base-app.vercel.app/image.png" />
   <meta property="og:url" content="https://weather-base-app.vercel.app/" />
@@ -100,7 +100,7 @@
       <div class="header">
         <div class="title" aria-live="polite">
           <img src="https://raw.githubusercontent.com/CryptoExplor/weather-mini-app/main/icon.png" alt="CastWeather logo" style="width: 24px; height: 24px; border-radius: 4px;">
-          <span>CastWeather</span>
+          <span>Weather</span>
           <span class="badge">Farcaster</span>
           <span class="user-badge" id="user-fid" style="display:none"></span>
         </div>
@@ -161,7 +161,7 @@
     // Endpoints
     const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
     const GEO_CODE   = "https://geocoding-api.open-meteo.com/v1/search";
-    const DEFAULT_CITY = { name:"New Delhi", latitude:28.6139, longitude:77.2090 };
+    const DEFAULT_CITY = { name:"Bangalore", latitude:12.9716, longitude:77.5946 };
 
     // WMO codes
     const WMO = {
@@ -217,19 +217,9 @@
     }
     function copy(t){ 
       try{ 
-        // Using document.execCommand('copy') for better iFrame compatibility
-        const textarea = document.createElement('textarea');
-        textarea.value = t;
-        textarea.style.position = 'fixed'; // Prevents scrolling to bottom of page in some browsers
-        document.body.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-
+        navigator.clipboard.writeText(t);
         toast("📋 Copied to clipboard!");
-      }catch(e){
-        console.error("Copy failed:", e);
+      }catch{
         toast("Copy failed");
       } 
     }
@@ -281,26 +271,6 @@
       const r = data.results[0];
       return { name: r.name, latitude: r.latitude, longitude: r.longitude, country:r.country };
     }
-    
-    // Reverse geocode to get city name from coordinates
-    async function reverseGeocode(lat, lon) {
-      try {
-        const response = await fetch(
-          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
-        );
-        const data = await response.json();
-        if (data && data.city) {
-          return `${data.city}${data.countryCode ? ', ' + data.countryCode : ''}`;
-        } else if (data && data.locality) {
-          return `${data.locality}${data.countryCode ? ', ' + data.countryCode : ''}`;
-        }
-        return "Your location";
-      } catch (error) {
-        console.error('Reverse geocoding error:', error);
-        return "Your location";
-      }
-    }
-
 
     // Render
     function render(data, placeName = "Your location"){
@@ -376,52 +346,13 @@
     async function initGeolocation(){
       return new Promise((resolve)=>{
         if (!navigator.geolocation){
-          resolve({ coords: { latitude: DEFAULT_CITY.latitude, longitude: DEFAULT_CITY.longitude }, from:"fallback" }); 
-          return;
+          resolve({ coords: { latitude: DEFAULT_CITY.latitude, longitude: DEFAULT_CITY.longitude }, from:"fallback" }); return;
         }
-        
-        // --- START GEOLOCATION FIX ---
-        // Applying the improved settings: high accuracy, increased timeout, and reduced max age.
-        const GEOLOCATION_OPTIONS = {
-          enableHighAccuracy: true,  // Use GPS for better accuracy
-          timeout: 15000,            // Increased from 8s to 15s
-          maximumAge: 60000          // Reduced from 5min (300000ms) to 1min
-        };
-
-        const errorCallback = (err) => {
-          // Detailed Error Logging
-          console.error("❌ Geolocation error:", err.code, err.message);
-          let userTip = "";
-
-          if (err.code === 1) {
-            console.log("User denied location permission");
-            userTip = "User denied location permission. Showing default location.";
-          } else if (err.code === 2) {
-            console.log("Location unavailable");
-            userTip = "Location unavailable. Showing default location.";
-          } else if (err.code === 3) {
-            console.log("Location timeout (15s exceeded)");
-            userTip = "Location timed out. Showing default location.";
-          } else {
-            userTip = "Location failed. Showing default location.";
-          }
-          
-          // Better User Feedback
-          toast("💡 Tip: Enable location permission for your local weather");
-          els.status.textContent = userTip;
-          
-          resolve({ coords: { latitude: DEFAULT_CITY.latitude, longitude: DEFAULT_CITY.longitude }, from:"fallback" });
-        };
-
         navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            console.log("✅ Location obtained successfully");
-            resolve({ coords: pos.coords, from:"geo" });
-          },
-          errorCallback,
-          GEOLOCATION_OPTIONS
+          (pos)=> resolve({ coords: pos.coords, from:"geo" }),
+          ()=> resolve({ coords: { latitude: DEFAULT_CITY.latitude, longitude: DEFAULT_CITY.longitude }, from:"fallback" }),
+          { enableHighAccuracy:false, timeout:8000, maximumAge:300000 }
         );
-        // --- END GEOLOCATION FIX ---
       });
     }
 
@@ -558,12 +489,17 @@
     els.btnCopy.addEventListener("click", copyWeather);
     els.btnAddMiniapp.addEventListener("click", addMiniApp);
     els.btnMyLoc.addEventListener("click", async ()=>{
-      els.status.textContent = "Detecting location…";
-      const { coords } = await initGeolocation();
-      lastGeo = { lat: coords.latitude, lon: coords.longitude };
-      const label = await reverseGeocode(coords.latitude, coords.longitude);
-      await loadByCoords(coords.latitude, coords.longitude, label);
-      scheduleAutoRefresh(coords.latitude, coords.longitude, label);
+      if (lastGeo){
+        const label = "Your location";
+        await loadByCoords(lastGeo.lat, lastGeo.lon, label);
+        scheduleAutoRefresh(lastGeo.lat, lastGeo.lon, label);
+      } else {
+        els.status.textContent = "Detecting location…";
+        const { coords } = await initGeolocation();
+        lastGeo = { lat: coords.latitude, lon: coords.longitude };
+        await loadByCoords(coords.latitude, coords.longitude, "Your location");
+        scheduleAutoRefresh(coords.latitude, coords.longitude, "Your location");
+      }
     });
 
     // Boot sequence
@@ -577,16 +513,7 @@
 
       // Load weather
       const { coords, from } = await initGeolocation();
-      let label;
-      if (from === 'geo') {
-        // Only attempt reverse geocoding if location was actually obtained via GPS
-        label = await reverseGeocode(coords.latitude, coords.longitude);
-      } else {
-        // This label is set when falling back
-        label = `${DEFAULT_CITY.name} (default)`;
-        // NOTE: els.status.textContent is handled within initGeolocation errorCallback for better feedback
-      }
-      
+      const label = from === "geo" ? "Your location" : `${DEFAULT_CITY.name}`;
       lastGeo = { lat: coords.latitude, lon: coords.longitude };
       await loadByCoords(coords.latitude, coords.longitude, label);
       scheduleAutoRefresh(coords.latitude, coords.longitude, label);
