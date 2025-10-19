@@ -16,10 +16,10 @@
     "version":"1",
     "imageUrl":"https://weather-base-app.vercel.app/image.png",
     "button":{
-      "title":"Weather",
+      "title":"CastWeather",
       "action":{
         "type":"launch_miniapp",
-        "name":"Weather",
+        "name":"CastWeather",
         "url":"https://weather-base-app.vercel.app/",
         "splashImageUrl":"https://weather-base-app.vercel.app/splash.png",
         "splashBackgroundColor":"#111111"
@@ -28,7 +28,7 @@
   }' />
   
   <!-- Open Graph -->
-  <meta property="og:title" content="Weather • Farcaster MiniApp" />
+  <meta property="og:title" content="CastWeather • Farcaster MiniApp" />
   <meta property="og:description" content="Get live weather, daily forecasts, and adaptive greetings right inside Farcaster." />
   <meta property="og:image" content="https://weather-base-app.vercel.app/image.png" />
   <meta property="og:url" content="https://weather-base-app.vercel.app/" />
@@ -161,7 +161,7 @@
     // Endpoints
     const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
     const GEO_CODE   = "https://geocoding-api.open-meteo.com/v1/search";
-    const DEFAULT_CITY = { name:"Bangalore", latitude:12.9716, longitude:77.5946 };
+    const DEFAULT_CITY = { name:"New Delhi", latitude:28.6139, longitude:77.2090 };
 
     // WMO codes
     const WMO = {
@@ -528,7 +528,14 @@
 
       // Load weather
       const { coords, from } = await initGeolocation();
-      let label = from === "geo" ? await reverseGeocode(coords.latitude, coords.longitude) : `${DEFAULT_CITY.name}`;
+      let label;
+      if (from === 'geo') {
+        label = await reverseGeocode(coords.latitude, coords.longitude);
+      } else {
+        label = `${DEFAULT_CITY.name} (default)`;
+        els.status.textContent = "Location off. Showing default.";
+      }
+      
       lastGeo = { lat: coords.latitude, lon: coords.longitude };
       await loadByCoords(coords.latitude, coords.longitude, label);
       scheduleAutoRefresh(coords.latitude, coords.longitude, label);
