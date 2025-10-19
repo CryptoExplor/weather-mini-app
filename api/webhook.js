@@ -7,10 +7,10 @@ export default async function handler(req, res) {
 
   try {
     const body = req.body;
-    // TODO: Verify JSON Farcaster Signature (header, payload, signature)
-    const payload = JSON.parse(atob(body.payload)); // Assuming base64 payload
+    // TODO: Verify JSON Farcaster Signature (header, payload, signature) - use @farcaster/core for verification
+    const payload = JSON.parse(atob(body.payload)); // Assuming base64 payload from Farcaster webhook
 
-    const { event, notificationDetails, fid } = payload; // fid from signature header
+    const { event, notificationDetails, fid } = payload; // fid from signature header or payload
 
     switch (event) {
       case 'miniapp_added':
@@ -18,7 +18,7 @@ export default async function handler(req, res) {
         if (notificationDetails) {
           await kv.set(`notification:${fid}`, {
             token: notificationDetails.token,
-            url: notificationDetails.url,
+            url: notificationDetails.url, // Farcaster notification endpoint
             updatedAt: Date.now()
           });
           console.log(`Stored notification token for FID ${fid}`);
