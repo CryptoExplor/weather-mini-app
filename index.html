@@ -217,9 +217,16 @@
     }
     function copy(t){ 
       try{ 
-        navigator.clipboard.writeText(t);
+        // Use document.execCommand('copy') for better compatibility in iFrames
+        const tempTextArea = document.createElement("textarea");
+        tempTextArea.value = t;
+        document.body.appendChild(tempTextArea);
+        tempTextArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempTextArea);
         toast("📋 Copied to clipboard!");
-      }catch{
+      }catch(e){
+        console.error("Copy failed:", e);
         toast("Copy failed");
       } 
     }
@@ -343,15 +350,29 @@
       }
     }
 
+    // 1. REPLACED initGeolocation() with improved version
     async function initGeolocation(){
       return new Promise((resolve)=>{
         if (!navigator.geolocation){
-          resolve({ coords: { latitude: DEFAULT_CITY.latitude, longitude: DEFAULT_CITY.longitude }, from:"fallback" }); return;
+          toast("📍 Geolocation not supported — using default city");
+          return resolve({ coords: DEFAULT_CITY, from:"fallback" });
         }
+
         navigator.geolocation.getCurrentPosition(
-          (pos)=> resolve({ coords: pos.coords, from:"geo" }),
-          ()=> resolve({ coords: { latitude: DEFAULT_CITY.latitude, longitude: DEFAULT_CITY.longitude }, from:"fallback" }),
-          { enableHighAccuracy:false, timeout:8000, maximumAge:300000 }
+          (pos)=>{
+            console.log("✅ Live location detected:", pos.coords);
+            toast("📍 Using your live location");
+            // NOTE: We don't save lastGeo here, we save it in the caller (boot/btnMyLoc)
+            resolve({ coords: pos.coords, from:"geo" });
+          },
+          (err)=>{
+            console.warn("⚠️ Geolocation error:", err.message);
+            toast("⚠️ " + (err.message || "Location blocked — using default"));
+            // Pass the default city coordinates on failure
+            resolve({ coords: DEFAULT_CITY, from:"fallback" });
+          },
+          // Increase timeout and set maximumAge=0 to force a fresh reading
+          { enableHighAccuracy:true, timeout:15000, maximumAge:0 }
         );
       });
     }
@@ -488,22 +509,31 @@
     els.btnCast.addEventListener("click", castWeather);
     els.btnCopy.addEventListener("click", copyWeather);
     els.btnAddMiniapp.addEventListener("click", addMiniApp);
+
+    // 2. REPLACED "📍" button logic
     els.btnMyLoc.addEventListener("click", async ()=>{
-      if (lastGeo){
-        const label = "Your location";
-        await loadByCoords(lastGeo.lat, lastGeo.lon, label);
-        scheduleAutoRefresh(lastGeo.lat, lastGeo.lon, label);
-      } else {
-        els.status.textContent = "Detecting location…";
-        const { coords } = await initGeolocation();
-        lastGeo = { lat: coords.latitude, lon: coords.longitude };
-        await loadByCoords(coords.latitude, coords.longitude, "Your location");
-        scheduleAutoRefresh(coords.latitude, coords.longitude, "Your location");
-      }
+      // Always re-attempt to get live location on click
+      els.status.textContent = "📍 Detecting your live location…";
+      const { coords, from } = await initGeolocation();
+
+      // Update lastGeo every time, regardless of success/failure
+      lastGeo = { lat: coords.latitude, lon: coords.longitude };
+
+      // Set label based on whether we got a live reading or the default fallback
+      const label = from === "geo" ? "Your location" : `${DEFAULT_CITY.name}`;
+      await loadByCoords(coords.latitude, coords.longitude, label);
+      scheduleAutoRefresh(coords.latitude, coords.longitude, label);
+
+      // Set final status message
+      els.status.textContent = from === "geo" 
+        ? "✅ Live location weather loaded"
+        : "⚠️ Using default city (no live location)";
     });
 
     // Boot sequence
     (async function boot(){
+      console.log("🧭 Boot: starting geolocation detection..."); // 3. Optional logging added
+
       // Show cached data immediately
       const cached = load("lastWeather");
       if (cached) { render(cached.data, cached.placeName); }
@@ -511,12 +541,18 @@
       // Initialize Farcaster context
       await initFarcasterContext();
 
-      // Load weather
+      // Load initial weather
       const { coords, from } = await initGeolocation();
       const label = from === "geo" ? "Your location" : `${DEFAULT_CITY.name}`;
-      lastGeo = { lat: coords.latitude, lon: coords.longitude };
+      lastGeo = { lat: coords.latitude, lon: coords.longitude }; // Correctly save the result
       await loadByCoords(coords.latitude, coords.longitude, label);
       scheduleAutoRefresh(coords.latitude, coords.longitude, label);
+      
+      // Update status to reflect boot result
+      els.status.textContent = from === "geo" 
+        ? "✅ Initial live location loaded"
+        : "⚠️ Initial load used default city (location blocked)";
+
 
       const lastCity = load("lastCity");
       if (lastCity) els.city.placeholder = `Try: ${lastCity.name}`;
