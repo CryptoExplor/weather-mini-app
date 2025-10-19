@@ -335,7 +335,7 @@
       }
     }
 
-    async function loadByCoords(lat, lon, label="Your location"){
+    async function loadByCoords(lat, lon, label){
       els.status.textContent = "Loading weather…";
       try{
         const data = await fetchWeather(lat, lon);
@@ -350,31 +350,43 @@
       }
     }
 
-    // 1. REPLACED initGeolocation() with improved version
+    // Improved geolocation with IP fallback
     async function initGeolocation(){
-      return new Promise((resolve)=>{
-        if (!navigator.geolocation){
-          toast("📍 Geolocation not supported — using default city");
-          return resolve({ coords: DEFAULT_CITY, from:"fallback" });
-        }
+      if (!navigator.geolocation){
+        toast("📍 Geolocation not supported");
+        return { lat: DEFAULT_CITY.latitude, lon: DEFAULT_CITY.longitude, label: DEFAULT_CITY.name, from:"fallback" };
+      }
 
-        navigator.geolocation.getCurrentPosition(
-          (pos)=>{
-            console.log("✅ Live location detected:", pos.coords);
-            toast("📍 Using your live location");
-            // NOTE: We don't save lastGeo here, we save it in the caller (boot/btnMyLoc)
-            resolve({ coords: pos.coords, from:"geo" });
-          },
-          (err)=>{
-            console.warn("⚠️ Geolocation error:", err.message);
-            toast("⚠️ " + (err.message || "Location blocked — using default"));
-            // Pass the default city coordinates on failure
-            resolve({ coords: DEFAULT_CITY, from:"fallback" });
-          },
-          // Increase timeout and set maximumAge=0 to force a fresh reading
-          { enableHighAccuracy:true, timeout:15000, maximumAge:0 }
-        );
-      });
+      try {
+        const pos = await new Promise((res, rej)=>{
+          navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy:true, timeout:15000, maximumAge:0 });
+        });
+        console.log("✅ Live location detected:", pos.coords);
+        toast("📍 Using your live location");
+        return { lat: pos.coords.latitude, lon: pos.coords.longitude, label: "Your location", from:"geo" };
+      } catch(err){
+        console.warn("⚠️ Geolocation error:", err.message);
+        toast("⚠️ Location access denied — trying IP lookup");
+        // Try IP-based location as fallback
+        try {
+          const res = await fetch('https://ipapi.co/json/');
+          if (!res.ok) throw new Error("IP fetch failed");
+          const data = await res.json();
+          if (data.error) throw new Error(data.reason);
+          if (data.latitude && data.longitude) {
+            const label = data.city ? `${data.city}${data.region ? `, ${data.region}` : ''}, ${data.country_name || data.country}`.trim() : "Your approximate location";
+            console.log("📍 IP location:", data);
+            toast("📍 Using IP-based location");
+            return { lat: parseFloat(data.latitude), lon: parseFloat(data.longitude), label, from:"ip" };
+          } else {
+            throw new Error("No coords in IP data");
+          }
+        } catch(ipErr){
+          console.warn("IP lookup failed:", ipErr);
+          toast("⚠️ IP lookup failed — using default city");
+          return { lat: DEFAULT_CITY.latitude, lon: DEFAULT_CITY.longitude, label: DEFAULT_CITY.name, from:"fallback" };
+        }
+      }
     }
 
     // Schedules
@@ -510,29 +522,23 @@
     els.btnCopy.addEventListener("click", copyWeather);
     els.btnAddMiniapp.addEventListener("click", addMiniApp);
 
-    // 2. REPLACED "📍" button logic
+    // 📍 button logic
     els.btnMyLoc.addEventListener("click", async ()=>{
-      // Always re-attempt to get live location on click
-      els.status.textContent = "📍 Detecting your live location…";
-      const { coords, from } = await initGeolocation();
-
-      // Update lastGeo every time, regardless of success/failure
-      lastGeo = { lat: coords.latitude, lon: coords.longitude };
-
-      // Set label based on whether we got a live reading or the default fallback
-      const label = from === "geo" ? "Your location" : `${DEFAULT_CITY.name}`;
-      await loadByCoords(coords.latitude, coords.longitude, label);
-      scheduleAutoRefresh(coords.latitude, coords.longitude, label);
-
-      // Set final status message
+      els.status.textContent = "📍 Detecting your location…";
+      const { lat, lon, label, from } = await initGeolocation();
+      lastGeo = { lat, lon };
+      await loadByCoords(lat, lon, label);
+      scheduleAutoRefresh(lat, lon, label);
       els.status.textContent = from === "geo" 
-        ? "✅ Live location weather loaded"
-        : "⚠️ Using default city (no live location)";
+        ? "✅ Live GPS location loaded"
+        : from === "ip" 
+        ? "📍 IP-based location loaded"
+        : "⚠️ Using default city";
     });
 
     // Boot sequence
     (async function boot(){
-      console.log("🧭 Boot: starting geolocation detection..."); // 3. Optional logging added
+      console.log("🧭 Boot: starting geolocation detection...");
 
       // Show cached data immediately
       const cached = load("lastWeather");
@@ -542,17 +548,17 @@
       await initFarcasterContext();
 
       // Load initial weather
-      const { coords, from } = await initGeolocation();
-      const label = from === "geo" ? "Your location" : `${DEFAULT_CITY.name}`;
-      lastGeo = { lat: coords.latitude, lon: coords.longitude }; // Correctly save the result
-      await loadByCoords(coords.latitude, coords.longitude, label);
-      scheduleAutoRefresh(coords.latitude, coords.longitude, label);
+      const { lat, lon, label, from } = await initGeolocation();
+      lastGeo = { lat, lon };
+      await loadByCoords(lat, lon, label);
+      scheduleAutoRefresh(lat, lon, label);
       
       // Update status to reflect boot result
       els.status.textContent = from === "geo" 
-        ? "✅ Initial live location loaded"
-        : "⚠️ Initial load used default city (location blocked)";
-
+        ? "✅ Live GPS location loaded"
+        : from === "ip" 
+        ? "📍 IP-based location loaded"
+        : "⚠️ Using default city (location unavailable)";
 
       const lastCity = load("lastCity");
       if (lastCity) els.city.placeholder = `Try: ${lastCity.name}`;
