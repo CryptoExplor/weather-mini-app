@@ -1,5 +1,5 @@
-import { kv } from '@vercel/kv';
-import { NeynarAPIClient } from '@neynar/nodejs-sdk';
+const { kv } = require('@vercel/kv');
+const { NeynarAPIClient } = require('@neynar/nodejs-sdk');
 
 // Init Neynar client
 const client = new NeynarAPIClient(process.env.NEYNAR_API_KEY);
@@ -18,7 +18,7 @@ const WMO = {
   95: { t: "Thunderstorm", e: "⛈️" }, 96: { t: "Thunderstorm with slight hail", e: "⛈️" }, 99: { t: "Thunderstorm with heavy hail", e: "⛈️" }
 };
 
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
   // Accept POST (manual) or GET (cron via x-vercel-cron header)
   if (req.method !== 'POST' && (req.method !== 'GET' || req.headers['x-vercel-cron'] !== 'true')) {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -82,14 +82,17 @@ export default async function handler(req, res) {
         const body = `${info.t} in ${label}. Good morning—tap for your full forecast! 🌤️`;
         const targetUrl = `https://weather-base-app.vercel.app/?context=notification&label=${encodeURIComponent(label)}`;
 
-        const response = await client.publishFrameNotifications({
-          targetFids: batchFids,  // Only these FIDs (Neynar sends if enabled)
-          filters: { minimum_user_score: 0.5 },  // Optional: High-engagement only
-          notification: {
-            title,
-            body,
-            target_url: targetUrl
-          }
+        // Send via Neynar (promise-based)
+        const response = await new Promise((resolve, reject) => {
+          client.publishFrameNotifications({
+            targetFids: batchFids,  // Only these FIDs (Neynar sends if enabled)
+            filters: { minimum_user_score: 0.5 },  // Optional: High-engagement only
+            notification: {
+              title,
+              body,
+              target_url: targetUrl
+            }
+          }).then(resolve).catch(reject);
         });
 
         console.log(`Neynar response for batch ${groupKey}:`, response);
@@ -105,4 +108,4 @@ export default async function handler(req, res) {
     console.error('Send error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
-}
+};
