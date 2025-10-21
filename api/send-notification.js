@@ -27,27 +27,27 @@ export default async function handler(req, res) {
   try {
     // Query all user locations from KV (scan keys matching pattern)
     const locations = [];
-    let cursor = 0;
+    let cursor = '0';  // Start with '0' as string (Redis convention)
     do {
-      const scanRes = await kv.scan(cursor, { match: 'location:*', count: 100 });
-      for (const key of scanRes.keys) {
-        const fid = key.name.split(':')[1];
-        const loc = await kv.get(key.name);
+      const [newCursor, keys] = await kv.scan(cursor, { match: 'location:*', count: 100 });
+      for (const key of keys) {
+        const fid = key.split(':')[1];
+        const loc = await kv.get(key);
         if (loc && loc.lat && loc.lon) {
           locations.push({ fid: parseInt(fid), ...loc });
         }
       }
-      cursor = scanRes.cursor;
-    } while (cursor !== 0);
+      cursor = newCursor;
+    } while (cursor !== '0');
 
     if (locations.length === 0) {
       return res.status(200).json({ success: true, message: 'No users with locations to notify' });
     }
 
-    // Group by approximate location (50km radius) for batching/personalization
+    // Group by approximate location (exact lat/lon match for simplicity; enhance with distance calc if needed)
     const groups = new Map();
     for (const loc of locations) {
-      const key = `${Math.round(loc.lat * 100)}-${Math.round(loc.lon * 100)}`; // Coarse grid
+      const key = `${loc.lat.toFixed(2)}-${loc.lon.toFixed(2)}`;  // Round to 0.01° (~1km grid)
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(loc.fid);
     }
@@ -68,6 +68,7 @@ export default async function handler(req, res) {
         const weatherRes = await fetch(weatherUrl);
         if (!weatherRes.ok) {
           console.error(`Weather fetch failed for group ${groupKey}`);
+          results.push({ success: false, error: 'Weather fetch failed', batchSize: batchFids.length });
           continue;
         }
         const weather = await weatherRes.json();
@@ -99,7 +100,7 @@ export default async function handler(req, res) {
       }
     }
 
-    res.status(200).json({ success: true, groupsProcessed: groups.size, totalBatches: results.length });
+    res.status(200).json({ success: true, groupsProcessed: groups.size, totalBatches: results.length, details: results });
   } catch (error) {
     console.error('Send error:', error);
     res.status(500).json({ success: false, error: error.message });
