@@ -3,11 +3,14 @@ let NeynarClient = null;
 let neynarError = null;
 
 try {
-  const { NeynarAPIClient } = require('@neynar/nodejs-sdk');
+  const { NeynarAPIClient, Configuration } = require('@neynar/nodejs-sdk');
   if (!process.env.NEYNAR_API_KEY) {
     throw new Error('NEYNAR_API_KEY env var missing');
   }
-  NeynarClient = new NeynarAPIClient(process.env.NEYNAR_API_KEY);
+  const config = new Configuration({
+    apiKey: process.env.NEYNAR_API_KEY,
+  });
+  NeynarClient = new NeynarAPIClient(config);
   console.log('Neynar client initialized');
 } catch (err) {
   neynarError = err.message;
