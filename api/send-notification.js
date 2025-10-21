@@ -1,8 +1,18 @@
 const { kv } = require('@vercel/kv');
-const { NeynarAPIClient } = require('@neynar/nodejs-sdk');
+let NeynarClient = null;
+let neynarError = null;
 
-// Init Neynar client
-const client = new NeynarAPIClient(process.env.NEYNAR_API_KEY);
+try {
+  const { NeynarAPIClient } = require('@neynar/nodejs-sdk');
+  if (!process.env.NEYNAR_API_KEY) {
+    throw new Error('NEYNAR_API_KEY env var missing');
+  }
+  NeynarClient = new NeynarAPIClient(process.env.NEYNAR_API_KEY);
+  console.log('Neynar client initialized');
+} catch (err) {
+  neynarError = err.message;
+  console.error('Neynar init failed:', err.message);
+}
 
 // Embedded WMO for weather icons/descriptions
 const WMO = {
@@ -24,12 +34,20 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  console.log('Send notification invoked');
+
+  if (neynarError) {
+    return res.status(500).json({ success: false, error: `Neynar setup failed: ${neynarError}` });
+  }
+
   try {
     // Query all user locations from KV (scan keys matching pattern)
     const locations = [];
     let cursor = '0';  // Start with '0' as string (Redis convention)
     do {
+      console.log(`Scanning KV with cursor: ${cursor}`);
       const [newCursor, keys] = await kv.scan(cursor, { match: 'location:*', count: 100 });
+      console.log(`Found ${keys.length} keys`);
       for (const key of keys) {
         const fid = key.split(':')[1];
         const loc = await kv.get(key);
@@ -39,6 +57,8 @@ module.exports = async (req, res) => {
       }
       cursor = newCursor;
     } while (cursor !== '0');
+
+    console.log(`Total locations found: ${locations.length}`);
 
     if (locations.length === 0) {
       return res.status(200).json({ success: true, message: 'No users with locations to notify' });
@@ -51,6 +71,8 @@ module.exports = async (req, res) => {
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(loc.fid);
     }
+
+    console.log(`Groups created: ${groups.size}`);
 
     const results = [];
     for (const [groupKey, fids] of groups) {
@@ -67,7 +89,7 @@ module.exports = async (req, res) => {
         const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=auto`;
         const weatherRes = await fetch(weatherUrl);
         if (!weatherRes.ok) {
-          console.error(`Weather fetch failed for group ${groupKey}`);
+          console.error(`Weather fetch failed for group ${groupKey}: ${weatherRes.status}`);
           results.push({ success: false, error: 'Weather fetch failed', batchSize: batchFids.length });
           continue;
         }
@@ -82,9 +104,12 @@ module.exports = async (req, res) => {
         const body = `${info.t} in ${label}. Good morning—tap for your full forecast! 🌤️`;
         const targetUrl = `https://weather-base-app.vercel.app/?context=notification&label=${encodeURIComponent(label)}`;
 
-        // Send via Neynar (promise-based)
-        const response = await new Promise((resolve, reject) => {
-          client.publishFrameNotifications({
+        console.log(`Sending to batch ${groupKey} (FIDs: ${batchFids.length})`);
+
+        // Send via Neynar (with try-catch)
+        let response;
+        try {
+          response = await NeynarClient.publishFrameNotifications({
             targetFids: batchFids,  // Only these FIDs (Neynar sends if enabled)
             filters: { minimum_user_score: 0.5 },  // Optional: High-engagement only
             notification: {
@@ -92,8 +117,12 @@ module.exports = async (req, res) => {
               body,
               target_url: targetUrl
             }
-          }).then(resolve).catch(reject);
-        });
+          });
+        } catch (sendErr) {
+          console.error(`Neynar send failed for ${groupKey}:`, sendErr.message);
+          results.push({ success: false, error: sendErr.message, batchSize: batchFids.length });
+          continue;
+        }
 
         console.log(`Neynar response for batch ${groupKey}:`, response);
         results.push({ success: true, batchSize: batchFids.length, requestId: response.request_id });
@@ -105,7 +134,7 @@ module.exports = async (req, res) => {
 
     res.status(200).json({ success: true, groupsProcessed: groups.size, totalBatches: results.length, details: results });
   } catch (error) {
-    console.error('Send error:', error);
+    console.error('Overall send error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 };
