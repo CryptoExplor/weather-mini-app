@@ -25,7 +25,7 @@
         "splashBackgroundColor":"#111111"
       }
     },
-    "webhookUrl": "https://weather-base-app.vercel.app/api/webhook"
+    "webhookUrl": "https://api.neynar.com/f/app/YOUR_CLIENT_ID/event"
   }' />
   
   <!-- Open Graph -->
@@ -285,51 +285,16 @@
       els.locationModal.style.display = "none";
     }
 
-    // Register location with server for notifications
-    async function registerLocation(fid, lat, lon, label) {
-      if (!fid) return;
-      try {
-        const res = await fetch('/api/register-location', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fid, lat, lon, label })
-        });
-        if (res.ok) {
-          console.log('✅ Location registered for notifications');
-        } else {
-          console.warn('Location registration failed');
-        }
-      } catch (err) {
-        console.error('Register location error:', err);
-      }
-    }
-
-    // Adaptive greeting (time + weather)
-    function adaptiveGreeting(code, name){
-      const hr = new Date().getHours();
-      const base =
-        (hr >= 6 && hr < 12) ? "☀️ Good morning" :
-        (hr >= 12 && hr < 18) ? "🌤️ Good afternoon" :
-        "🌙 Good evening";
-      let tail = " Let's build something new today.";
-      if ([0,1].includes(code)) tail = " Bright and clear — perfect day to ship!";
-      else if ([2,3,45,48].includes(code)) tail = " Cloudy skies — cozy coding weather.";
-      else if ([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code)) tail = " Rainy vibes — great time to code indoors.";
-      else if ([71,73,75,77,85,86].includes(code)) tail = " Snowy mood — warm beverage and deep focus.";
-      else if ([95,96,99].includes(code)) tail = " Stormy out — perfect to build something big inside.";
-      const msg = `${base}${name?`, ${name}`:""}!${tail}`;
-      els.greeting.textContent = msg;
-      save("greetMsg", msg);
-    }
-
-    // Handle notification open
-    function handleNotificationContext(context) {
-      if (context.location && context.location.type === 'notification') {
-        const notif = context.location.notification;
-        toast(`🔔 Opened from notification: ${notif.title} - ${notif.body}`);
+    // Handle notification open (via URL params)
+    function handleNotificationContext() {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('context') === 'notification') {
+        const title = urlParams.get('title') || 'Daily Weather Alert';
+        const body = urlParams.get('body') || 'Check your local forecast now.';
+        toast(`🔔 Opened from notification: ${title} - ${body}`);
         // Optionally, set greeting or update UI based on notification
-        els.greeting.textContent = `${notif.body} Thanks for checking in! 🌤️`;
-        console.log('Notification context:', notif);
+        els.greeting.textContent = `${body} Thanks for checking in! 🌤️`;
+        console.log('Notification context detected via URL params');
       }
     }
 
@@ -546,7 +511,25 @@
       }, { once:true });
     }
 
-    // Morning greeting check + optional notifications (now Farcaster-aware)
+    // Adaptive greeting (time + weather)
+    function adaptiveGreeting(code, name){
+      const hr = new Date().getHours();
+      const base =
+        (hr >= 6 && hr < 12) ? "☀️ Good morning" :
+        (hr >= 12 && hr < 18) ? "🌤️ Good afternoon" :
+        "🌙 Good evening";
+      let tail = " Let's build something new today.";
+      if ([0,1].includes(code)) tail = " Bright and clear — perfect day to ship!";
+      else if ([2,3,45,48].includes(code)) tail = " Cloudy skies — cozy coding weather.";
+      else if ([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code)) tail = " Rainy vibes — great time to code indoors.";
+      else if ([71,73,75,77,85,86].includes(code)) tail = " Snowy mood — warm beverage and deep focus.";
+      else if ([95,96,99].includes(code)) tail = " Stormy out — perfect to build something big inside.";
+      const msg = `${base}${name?`, ${name}`:""}!${tail}`;
+      els.greeting.textContent = msg;
+      save("greetMsg", msg);
+    }
+
+    // Morning greeting check + optional notifications (now Farcaster-aware; Neynar handles sending)
     async function checkMorningGreeting(farcasterContext = null) {
       const lastMsgDate = load("lastGreetDate", "");
       const today = new Date().toDateString();
@@ -556,24 +539,8 @@
         if ("Notification" in window && Notification.permission === "granted") {
           try { new Notification("🌤️ Daily Weather", { body: greetMsg }); } catch {}
         }
-        // If in Farcaster and user added app, queue server-side notification
-        if (farcasterContext?.user?.fid && lastGeo) {
-          try {
-            await fetch('/api/queue-morning', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                fid: farcasterContext.user.fid, 
-                lat: lastGeo.lat, 
-                lon: lastGeo.lon, 
-                label: lastGeo.label || "Your location" 
-              })
-            });
-            console.log("✅ Morning notification queued");
-          } catch (err) {
-            console.error("Queue morning error:", err);
-          }
-        }
+        // Neynar handles notifications server-side; no queue needed here
+        console.log("✅ Morning greeting shown; notifications via Neynar");
         save("lastGreetDate", today);
       }
     }
@@ -635,8 +602,14 @@
         els.btnAddMiniapp.disabled = true;
         els.btnAddMiniapp.textContent = "Adding...";
         
-        await sdk.actions.addMiniApp();
-        toast("✅ MiniApp added! Notifications enabled.");
+        const result = await sdk.actions.addMiniApp();
+        if (result.added) {
+          toast("✅ MiniApp added! Enable notifications in app settings for daily alerts.");
+          console.log('App added successfully');
+        } else {
+          console.error('Add failed:', result.reason);
+          toast("Add MiniApp failed - check console");
+        }
       } catch(err) {
         console.error("Add MiniApp error:", err);
         toast("Add MiniApp failed");
@@ -658,8 +631,6 @@
           els.userFid.textContent = `FID: ${farcasterUser.fid}`;
           els.userFid.style.display = "inline-flex";
           console.log("Farcaster user:", farcasterUser);
-          // Handle if opened from notification
-          handleNotificationContext(farcasterContext);
         }
       } catch(err) {
         console.log("No Farcaster context (running outside miniapp):", err);
@@ -678,10 +649,6 @@
         await loadByCoords(loc.latitude, loc.longitude, label);
         scheduleAutoRefresh(loc.latitude, loc.longitude, label);
         save("lastCity", loc);
-        // Register updated location if Farcaster user
-        if (farcasterUser) {
-          registerLocation(farcasterUser.fid, loc.latitude, loc.longitude, label);
-        }
       }catch(err){
         console.error(err);
         els.status.textContent = "City not found";
@@ -707,10 +674,6 @@
           : from === "ip" 
           ? "📍 IP-based location loaded"
           : "⚠️ Using default city";
-        // Register location if Farcaster user
-        if (farcasterUser) {
-          registerLocation(farcasterUser.fid, lat, lon, label);
-        }
       } catch(err) {
         // Modal is shown in initGeolocation on denial
         console.warn("Location denied, modal shown");
@@ -731,9 +694,6 @@
           : from === "network" 
           ? "📍 Network location loaded"
           : "⚠️ Still unable to get location";
-        if (farcasterUser) {
-          registerLocation(farcasterUser.fid, lat, lon, label);
-        }
       } catch(retryErr) {
         // If retry also denied, keep modal or fallback
         if (retryErr.code === 1) {
@@ -747,9 +707,6 @@
           await loadByCoords(ipLoc.lat, ipLoc.lon, ipLoc.label);
           scheduleAutoRefresh(ipLoc.lat, ipLoc.lon, ipLoc.label);
           els.status.textContent = "📍 IP-based location loaded";
-          if (farcasterUser) {
-            registerLocation(farcasterUser.fid, ipLoc.lat, ipLoc.lon, ipLoc.label);
-          }
         }
       }
     });
@@ -762,14 +719,14 @@
       await loadByCoords(ipLoc.lat, ipLoc.lon, ipLoc.label);
       scheduleAutoRefresh(ipLoc.lat, ipLoc.lon, ipLoc.label);
       els.status.textContent = ipLoc.from === "ip" ? "📍 IP-based location loaded" : "⚠️ Using default city";
-      if (farcasterUser) {
-        registerLocation(farcasterUser.fid, ipLoc.lat, ipLoc.lon, ipLoc.label);
-      }
     });
 
     // Boot sequence
     (async function boot(){
       console.log("🧭 Boot: starting geolocation detection...");
+
+      // Check for notification context first
+      handleNotificationContext();
 
       // Show cached data immediately
       const cached = load("lastWeather");
@@ -793,10 +750,6 @@
           : from === "ip" 
           ? "📍 IP-based location loaded"
           : "⚠️ Using default city (location unavailable)";
-        // Register initial location if Farcaster user
-        if (farcasterUser) {
-          registerLocation(farcasterUser.fid, lat, lon, label);
-        }
       } catch(err) {
         // On denial during boot, show modal
         if (err.code === 1) {
@@ -810,9 +763,6 @@
             await loadByCoords(ipLoc.lat, ipLoc.lon, ipLoc.label);
             scheduleAutoRefresh(ipLoc.lat, ipLoc.lon, ipLoc.label);
             els.status.textContent = ipLoc.from === "ip" ? "📍 IP-based location loaded" : "⚠️ Using default city";
-            if (farcasterUser) {
-              registerLocation(farcasterUser.fid, ipLoc.lat, ipLoc.lon, ipLoc.label);
-            }
           }, 1000);
         } else {
           // For other errors, fallback to IP
@@ -823,9 +773,6 @@
           await loadByCoords(ipLoc.lat, ipLoc.lon, ipLoc.label);
           scheduleAutoRefresh(ipLoc.lat, ipLoc.lon, ipLoc.label);
           els.status.textContent = ipLoc.from === "ip" ? "📍 IP-based location loaded" : "⚠️ Using default city";
-          if (farcasterUser) {
-            registerLocation(farcasterUser.fid, ipLoc.lat, ipLoc.lon, ipLoc.label);
-          }
         }
       }
 
