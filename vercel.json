@@ -6,9 +6,12 @@
       "permanent": false
     }
   ],
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" }
+  ],
   "crons": [
     {
-      "path": "/api/daily-notifications",
+      "path": "/api/send-notification",
       "schedule": "0 5 * * *"
     }
   ],
