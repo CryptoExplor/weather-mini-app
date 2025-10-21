@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "CastWeather: A Farcaster MiniApp for live weather, forecasts, and notifications",
   "main": "index.js",
-  "type": "module",
   "scripts": {
     "dev": "vercel dev",
     "build": "echo 'No build step required'",
