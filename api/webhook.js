@@ -1,4 +1,5 @@
-import { kv } from '@vercel/kv';
+const { parseWebhookEvent, verifyAppKeyWithNeynar } = require('@farcaster/miniapp-node');
+const { saveToken, deleteToken } = require('./storage');
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -6,36 +7,32 @@ export default async function handler(req, res) {
   }
 
   try {
-    const body = req.body;
-    // TODO: Verify JSON Farcaster Signature (header, payload, signature) - use @farcaster/core for verification
-    const payload = JSON.parse(atob(body.payload)); // Assuming base64 payload from Farcaster webhook
-
-    const { event, notificationDetails, fid } = payload; // fid from signature header or payload
+    // Verify event (throws on invalid)
+    const data = await parseWebhookEvent(req.body, verifyAppKeyWithNeynar);
+    const { fid, event } = data;
 
     switch (event) {
       case 'miniapp_added':
       case 'notifications_enabled':
-        if (notificationDetails) {
-          await kv.set(`notification:${fid}`, {
-            token: notificationDetails.token,
-            url: notificationDetails.url, // Farcaster notification endpoint
-            updatedAt: Date.now()
-          });
-          console.log(`Stored notification token for FID ${fid}`);
+        if (data.notificationDetails) {
+          const { url, token } = data.notificationDetails;
+          await saveToken(fid, url, token);
+          console.log(`Saved token for FID ${fid}`);
         }
         break;
       case 'miniapp_removed':
       case 'notifications_disabled':
-        await kv.del(`notification:${fid}`);
-        console.log(`Removed notification token for FID ${fid}`);
+        await deleteToken(fid);
+        console.log(`Deleted token for FID ${fid}`);
         break;
       default:
-        console.log('Unknown event:', event);
+        console.log(`Unknown event: ${event}`);
     }
 
     res.status(200).json({ success: true });
   } catch (error) {
     console.error('Webhook error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    // Still return 200 to ack (Farcaster retries on non-2xx)
+    res.status(200).json({ success: false, error: error.message });
   }
 }
