@@ -7,7 +7,7 @@
     "imageUrl": "https://weather-base-app.vercel.app/image.png",
     "buttonTitle": "CastWeather",
     "splashImageUrl": "https://weather-base-app.vercel.app/splash.png",
-    "splashBackgroundColor": "#111111",
+    "splashBackgroundColor": "#6A3CFF",
     "webhookUrl": "https://api.neynar.com/f/app/a701b63d-1e2b-4f40-916a-53d8c66dbddf/event",
     "subtitle": "Weather Farcaster MiniApp",
     "description": "Get live weather, daily forecasts, adaptive greetings, and morning notifications right inside Farcaster.",
