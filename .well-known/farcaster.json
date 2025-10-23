@@ -1,5 +1,5 @@
 {
-  "miniapp": {
+  "frame": {
     "name": "CastWeather",
     "version": "1",
     "iconUrl": "https://weather-base-app.vercel.app/icon.png",
