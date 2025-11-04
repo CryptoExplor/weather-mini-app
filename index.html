@@ -8,10 +8,8 @@
   <link rel="icon" href="https://raw.githubusercontent.com/CryptoExplor/weather-mini-app/main/icon.png" />
   <meta name="description" content="Get live weather, daily forecasts, adaptive greetings, and morning notifications right inside Farcaster." />
   
-  <!-- Preconnect for Quick Auth performance -->
   <link rel="preconnect" href="https://auth.farcaster.xyz" />
   
-  <!-- Farcaster Mini App Metadata -->
   <meta name="fc:miniapp" content='{
     "version":"1",
     "imageUrl":"https://weather-base-app.vercel.app/image.png",
@@ -28,7 +26,6 @@
     "webhookUrl": "https://api.neynar.com/f/app/a701b63d-1e2b-4f40-916a-53d8c66dbddf/event"
   }' />
   
-  <!-- Open Graph -->
   <meta property="og:title" content="Weather • Farcaster MiniApp" />
   <meta property="og:description" content="Get live weather, daily forecasts, and adaptive greetings right inside Farcaster." />
   <meta property="og:image" content="https://weather-base-app.vercel.app/image.png" />
@@ -94,7 +91,6 @@
     .bg-night{ background: linear-gradient(160deg, #2e1065 0%, #581c87 60%, #111827 120%) fixed; }
     @media (prefers-reduced-motion: reduce){ *{ transition:none !important; animation:none !important; } }
 
-    /* Modal styles */
     .modal {
       display: none;
       position: fixed;
@@ -167,7 +163,6 @@
 
       <div class="greeting" id="greeting" role="status">Fetching your greeting…</div>
 
-      <!-- Share buttons -->
       <div class="share-row">
         <button id="btn-cast" title="Cast weather on Farcaster">🟣 CastWeather</button>
         <button id="btn-copy" class="ghost" title="Copy weather">📋 Copy</button>
@@ -184,25 +179,22 @@
     </div>
   </div>
 
-  <!-- Location Permission Modal -->
   <div id="locationModal" class="modal">
     <div class="modal-content">
       <h3 id="modal-title">📍 Enable Location Access</h3>
-      <p id="modal-message">To get accurate weather for your area, please allow location access in your browser settings. This uses your device's GPS or nearby cell towers/WiFi for precision.</p>
+      <p id="modal-message">To get accurate weather for your area, please allow location access in your browser settings.</p>
       <button id="retryLocation" class="ghost">Retry Location</button>
       <button id="useIP" class="close">Use Approximate Location</button>
     </div>
   </div>
 
   <script type="module">
-    import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
+    import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk@0.1.0';
 
-    // Endpoints
     const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
     const GEO_CODE   = "https://geocoding-api.open-meteo.com/v1/search";
     const DEFAULT_CITY = { name:"Bangalore", latitude:12.9716, longitude:77.5946 };
 
-    // WMO codes
     const WMO = {
       0:{t:"Clear sky",e:"☀️",bg:"sunny"}, 1:{t:"Mainly clear",e:"🌤️",bg:"sunny"}, 2:{t:"Partly cloudy",e:"⛅",bg:"cloudy"}, 3:{t:"Overcast",e:"☁️",bg:"cloudy"},
       45:{t:"Fog",e:"🌫️",bg:"cloudy"}, 48:{t:"Depositing rime fog",e:"🌫️",bg:"cloudy"},
@@ -216,7 +208,6 @@
       95:{t:"Thunderstorm",e:"⛈️",bg:"rainy"}, 96:{t:"Thunderstorm with slight hail",e:"⛈️",bg:"rainy"}, 99:{t:"Thunderstorm with heavy hail",e:"⛈️",bg:"rainy"}
     };
 
-    // DOM
     const els = {
       emoji: document.getElementById("emoji"),
       temp: document.getElementById("temp"),
@@ -243,11 +234,13 @@
       useIP: document.getElementById("useIP")
     };
 
-    // Storage helpers
-    const save = (k,v) => localStorage.setItem(k, JSON.stringify(v));
-    const load = (k,d=null) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
+    const save = (k,v) => {
+      try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) { console.warn('localStorage save failed:', e); }
+    };
+    const load = (k,d=null) => { 
+      try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } 
+    };
 
-    // UI helpers
     function setBackgroundByCode(code, isNight=false){
       const info = WMO[code] || WMO[2];
       document.body.className = isNight ? "bg-night" : `bg-${info.bg}`;
@@ -257,13 +250,14 @@
     }
     function toast(msg){
       els.status.textContent = msg;
-      setTimeout(()=> els.status.textContent = "", 2500);
+      setTimeout(()=> els.status.textContent = "", 3000);
     }
     function copy(t){ 
       try{ 
-        // Use document.execCommand('copy') for better compatibility in iFrames
         const tempTextArea = document.createElement("textarea");
         tempTextArea.value = t;
+        tempTextArea.style.position = "fixed";
+        tempTextArea.style.opacity = "0";
         document.body.appendChild(tempTextArea);
         tempTextArea.select();
         document.execCommand('copy');
@@ -275,8 +269,7 @@
       } 
     }
 
-    // Show/hide modal
-    function showLocationModal(title = "Enable Location Access", message = "To get accurate weather for your area, please allow location access in your browser settings. This uses your device's GPS or nearby cell towers/WiFi for precision.") {
+    function showLocationModal(title = "Enable Location Access", message = "To get accurate weather for your area, please allow location access in your browser settings.") {
       els.modalTitle.textContent = title;
       els.modalMessage.textContent = message;
       els.locationModal.style.display = "block";
@@ -285,20 +278,15 @@
       els.locationModal.style.display = "none";
     }
 
-    // Handle notification open (via URL params)
     function handleNotificationContext() {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('context') === 'notification') {
-        const title = urlParams.get('title') || 'Daily Weather Alert';
-        const body = urlParams.get('body') || 'Check your local forecast now.';
-        toast(`🔔 Opened from notification: ${title} - ${body}`);
-        // Optionally, set greeting or update UI based on notification
-        els.greeting.textContent = `${body} Thanks for checking in! 🌤️`;
-        console.log('Notification context detected via URL params');
+        const label = urlParams.get('label') || 'your area';
+        toast(`🔔 Welcome back! Showing weather for ${label}`);
+        els.greeting.textContent = `Welcome back! Check out the latest weather. 🌤️`;
       }
     }
 
-    // Relative "Updated Xm ago"
     let lastUpdatedTs = null;
     function setUpdatedNow(){
       lastUpdatedTs = Date.now();
@@ -311,7 +299,6 @@
       els.refresh.textContent = `Updated • ${mins}m ago`;
     }, 60000);
 
-    // Weather fetch
     async function fetchWeather(lat, lon){
       const url = `${OPEN_METEO}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code,is_day&hourly=weather_code,temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=5&timezone=auto`;
       const res = await fetch(url, { cache:"no-store" });
@@ -328,7 +315,6 @@
       return { name: r.name, latitude: r.latitude, longitude: r.longitude, country:r.country };
     }
 
-    // Render
     function render(data, placeName = "Your location"){
       try{
         const cur = data.current;
@@ -346,17 +332,14 @@
         els.feels.textContent = `${Math.round(cur.apparent_temperature ?? cur.temperature_2m)}°C`;
         els.ltime.textContent = formatTimeLocal(cur.time);
 
-        // Temp-change alert
         const prevTemp = load("lastTemp", null);
         if (prevTemp !== null && Math.abs(prevTemp - cur.temperature_2m) > 3){
           toast(`🌡️ Temp changed ${Math.round(cur.temperature_2m - prevTemp)}°C since last check`);
         }
         save("lastTemp", cur.temperature_2m);
 
-        // Adaptive greeting
         adaptiveGreeting(code, (placeName || "").split(",")[0]);
 
-        // Forecast
         els.forecast.innerHTML = "";
         if (daily && daily.time && daily.time.length){
           const days = daily.time.slice(0,5);
@@ -399,7 +382,6 @@
       }
     }
 
-    // IP-based location fallback
     async function getIPLocation() {
       try {
         const res = await fetch('https://ipapi.co/json/');
@@ -418,7 +400,6 @@
       }
     }
 
-    // Geolocation error messages
     function getGeolocationErrorMessage(code, message) {
       switch (code) {
         case 1:
@@ -429,12 +410,12 @@
         case 2:
           return {
             title: "📍 Location Unavailable",
-            message: "Unable to determine your location. This could be due to no GPS signal or device issues. Trying approximate location."
+            message: "Unable to determine your location. This could be due to no GPS signal or device issues."
           };
         case 3:
           return {
             title: "📍 Location Timeout",
-            message: "Location request timed out. Please check your connection or try again. Falling back to approximate location."
+            message: "Location request timed out. Please check your connection or try again."
           };
         default:
           return {
@@ -444,7 +425,6 @@
       }
     }
 
-    // Improved geolocation with GPS first, then network (cell/WiFi), then IP
     async function getGeoLocation(accuracy = 'high') {
       const options = {
         timeout: 15000,
@@ -452,9 +432,7 @@
         enableHighAccuracy: accuracy === 'high'
       };
       return new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, (error) => {
-          reject(error);
-        }, options);
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
       });
     }
 
@@ -465,41 +443,37 @@
       }
 
       try {
-        // 1st: GPS (high accuracy)
         const pos = await getGeoLocation('high');
-        console.log("✅ GPS location detected:", pos.coords);
+        console.log("✅ GPS location detected");
         toast("📍 Using GPS location");
         return { lat: pos.coords.latitude, lon: pos.coords.longitude, label: "Your location", from:"gps" };
       } catch(err) {
         let errorInfo = getGeolocationErrorMessage(err.code, err.message);
         console.warn("⚠️ GPS error:", err);
-        if (err.code === 1) { // PERMISSION_DENIED
+        if (err.code === 1) {
           toast("⚠️ Location permission denied");
           showLocationModal(errorInfo.title, errorInfo.message);
-          throw err; // Let caller handle modal
+          throw err;
         }
 
         try {
-          // 2nd: Network (cell tower/WiFi, low accuracy)
           const pos = await getGeoLocation('low');
-          console.log("✅ Network location (cell/WiFi) detected:", pos.coords);
-          toast("📍 Using nearby cell tower/WiFi location");
+          console.log("✅ Network location detected");
+          toast("📍 Using network location");
           return { lat: pos.coords.latitude, lon: pos.coords.longitude, label: "Your approximate location", from:"network" };
         } catch(netErr) {
           let netErrorInfo = getGeolocationErrorMessage(netErr.code, netErr.message);
           console.warn("⚠️ Network location error:", netErr);
-          if (netErr.code === 1) { // Also denied
+          if (netErr.code === 1) {
             toast("⚠️ Location permission denied");
             showLocationModal(netErrorInfo.title, netErrorInfo.message);
             throw netErr;
           }
-          // 3rd: IP
           return await getIPLocation();
         }
       }
     }
 
-    // Schedules
     let lastGeo = null;
     let refreshTimer = null;
     function scheduleAutoRefresh(lat, lon, label){
@@ -511,7 +485,6 @@
       }, { once:true });
     }
 
-    // Adaptive greeting (time + weather)
     function adaptiveGreeting(code, name){
       const hr = new Date().getHours();
       const base =
@@ -529,30 +502,16 @@
       save("greetMsg", msg);
     }
 
-    // Morning greeting check + optional notifications (now Farcaster-aware; Neynar handles sending)
-    async function checkMorningGreeting(farcasterContext = null) {
+    async function checkMorningGreeting() {
       const lastMsgDate = load("lastGreetDate", "");
       const today = new Date().toDateString();
       if (lastMsgDate !== today) {
         const greetMsg = load("greetMsg", "Good morning!");
         toast(greetMsg);
-        if ("Notification" in window && Notification.permission === "granted") {
-          try { new Notification("🌤️ Daily Weather", { body: greetMsg }); } catch {}
-        }
-        // Neynar handles notifications server-side; no queue needed here
-        console.log("✅ Morning greeting shown; notifications via Neynar");
         save("lastGreetDate", today);
       }
     }
-    if ("Notification" in window && Notification.permission === "default") {
-      try { Notification.requestPermission().catch(()=>{}); } catch {}
-    }
-    setInterval(()=>{
-      const hr = new Date().getHours();
-      if (hr >= 6 && hr < 9) checkMorningGreeting();
-    }, 60 * 60 * 1000);
 
-    // Generate weather text for sharing
     function getWeatherText(){
       const emoji = els.emoji.textContent;
       const temp = els.temp.textContent;
@@ -562,16 +521,31 @@
       return `${emoji} Weather Update\n\n${temp} ${cond}\n💧 ${humid} humidity • 🍃 ${wind} wind\n\nvia CastWeather MiniApp 🌤️`;
     }
 
-    // Cast weather using Farcaster SDK
+    // Global SDK state
+    let sdkReady = false;
+    let farcasterUser = null;
+    let farcasterContext = null;
+
+    // Cast weather with proper error handling
     async function castWeather(){
+      if (!sdkReady) {
+        toast("⚠️ Not running in Farcaster app");
+        console.log("SDK not ready, falling back to copy");
+        copyWeather();
+        return;
+      }
+
       try {
         els.btnCast.disabled = true;
         els.btnCast.textContent = "Casting...";
         
+        console.log("Attempting to compose cast...");
         const result = await sdk.actions.composeCast({
           text: getWeatherText(),
           embeds: ["https://weather-base-app.vercel.app/"]
         });
+
+        console.log("Cast result:", result);
 
         if (result?.cast) {
           toast(`✅ Cast posted! Hash: ${result.cast.hash.slice(0,10)}...`);
@@ -580,35 +554,42 @@
             console.log("Posted to channel:", result.cast.channelKey);
           }
         } else {
-          toast("Cast cancelled");
+          toast("Cast cancelled or failed");
+          console.log("Cast was cancelled or returned no result");
         }
       } catch(err) {
         console.error("Cast error:", err);
-        toast("Cast failed - try copy instead");
+        toast("Cast failed - copied to clipboard instead");
+        copyWeather();
       } finally {
         els.btnCast.disabled = false;
         els.btnCast.textContent = "🟣 CastWeather";
       }
     }
 
-    // Copy to clipboard
     function copyWeather(){
       copy(getWeatherText());
     }
 
-    // Add MiniApp using Farcaster SDK
     async function addMiniApp(){
+      if (!sdkReady) {
+        toast("⚠️ Not running in Farcaster app");
+        return;
+      }
+
       try {
         els.btnAddMiniapp.disabled = true;
         els.btnAddMiniapp.textContent = "Adding...";
         
+        console.log("Attempting to add miniapp...");
         const result = await sdk.actions.addMiniApp();
+        console.log("Add miniapp result:", result);
+
         if (result.added) {
-          toast("✅ MiniApp added! Enable notifications in app settings for daily alerts.");
-          console.log('App added successfully');
+          toast("✅ MiniApp added! Enable notifications in app settings.");
         } else {
           console.error('Add failed:', result.reason);
-          toast("Add MiniApp failed - check console");
+          toast(`Add failed: ${result.reason || 'Unknown reason'}`);
         }
       } catch(err) {
         console.error("Add MiniApp error:", err);
@@ -619,25 +600,43 @@
       }
     }
 
-    // Initialize Farcaster context
-    let farcasterUser = null;
-    let farcasterContext = null;
     async function initFarcasterContext(){
       try {
-        // Try to get authenticated user via Quick Auth
+        console.log("Initializing Farcaster SDK...");
+        
+        // Wait for SDK to be ready
+        await sdk.actions.ready();
+        console.log("SDK ready signal sent");
+
+        // Get context
         farcasterContext = await sdk.context;
+        console.log("Farcaster context:", farcasterContext);
+
         if (farcasterContext?.user?.fid) {
           farcasterUser = farcasterContext.user;
           els.userFid.textContent = `FID: ${farcasterUser.fid}`;
           els.userFid.style.display = "inline-flex";
-          console.log("Farcaster user:", farcasterUser);
+          console.log("Farcaster user authenticated:", farcasterUser);
+          sdkReady = true;
+          
+          // Update button states
+          els.btnCast.disabled = false;
+          els.btnAddMiniapp.disabled = false;
+        } else {
+          console.log("No user context found");
+          sdkReady = false;
+          els.btnCast.title = "Only available in Farcaster app";
+          els.btnAddMiniapp.title = "Only available in Farcaster app";
         }
       } catch(err) {
-        console.log("No Farcaster context (running outside miniapp):", err);
+        console.log("Not running in Farcaster context:", err);
+        sdkReady = false;
+        els.btnCast.title = "Only available in Farcaster app";
+        els.btnAddMiniapp.title = "Only available in Farcaster app";
       }
     }
 
-    // Events
+    // Event listeners
     els.btnSearch.addEventListener("click", async ()=>{
       const q = els.city.value.trim();
       if (!q) return;
@@ -654,12 +653,15 @@
         els.status.textContent = "City not found";
       }
     });
-    els.city.addEventListener("keydown", (e)=>{ if (e.key === "Enter") els.btnSearch.click(); });
+
+    els.city.addEventListener("keydown", (e)=>{ 
+      if (e.key === "Enter") els.btnSearch.click(); 
+    });
+
     els.btnCast.addEventListener("click", castWeather);
     els.btnCopy.addEventListener("click", copyWeather);
     els.btnAddMiniapp.addEventListener("click", addMiniApp);
 
-    // 📍 button logic
     els.btnMyLoc.addEventListener("click", async ()=>{
       try {
         els.status.textContent = "📍 Detecting your location…";
@@ -670,17 +672,15 @@
         els.status.textContent = from === "gps" 
           ? "✅ GPS location loaded"
           : from === "network" 
-          ? "📍 Network (cell/WiFi) location loaded"
+          ? "📍 Network location loaded"
           : from === "ip" 
           ? "📍 IP-based location loaded"
           : "⚠️ Using default city";
       } catch(err) {
-        // Modal is shown in initGeolocation on denial
         console.warn("Location denied, modal shown");
       }
     });
 
-    // Modal events
     els.retryLocation.addEventListener("click", async () => {
       hideLocationModal();
       els.status.textContent = "📍 Retrying GPS location…";
@@ -695,12 +695,10 @@
           ? "📍 Network location loaded"
           : "⚠️ Still unable to get location";
       } catch(retryErr) {
-        // If retry also denied, keep modal or fallback
         if (retryErr.code === 1) {
           const errorInfo = getGeolocationErrorMessage(retryErr.code, retryErr.message);
           showLocationModal(errorInfo.title, errorInfo.message);
         } else {
-          // Fallback to IP for other errors
           els.status.textContent = "📍 Falling back to IP location…";
           const ipLoc = await getIPLocation();
           lastGeo = { lat: ipLoc.lat, lon: ipLoc.lon, label: ipLoc.label };
@@ -723,40 +721,37 @@
 
     // Boot sequence
     (async function boot(){
-      console.log("🧭 Boot: starting geolocation detection...");
+      console.log("🧭 Boot: starting initialization...");
 
-      // Check for notification context first
       handleNotificationContext();
 
-      // Show cached data immediately
       const cached = load("lastWeather");
-      if (cached) { render(cached.data, cached.placeName); }
+      if (cached) { 
+        render(cached.data, cached.placeName); 
+        console.log("Loaded cached weather data");
+      }
 
-      // Initialize Farcaster context
+      // Initialize Farcaster context FIRST before showing weather
       await initFarcasterContext();
 
-      // Load initial weather
       try {
         const { lat, lon, label, from } = await initGeolocation();
         lastGeo = { lat, lon, label };
         await loadByCoords(lat, lon, label);
         scheduleAutoRefresh(lat, lon, label);
         
-        // Update status to reflect boot result
         els.status.textContent = from === "gps" 
           ? "✅ GPS location loaded"
           : from === "network" 
-          ? "📍 Network (cell/WiFi) location loaded"
+          ? "📍 Network location loaded"
           : from === "ip" 
           ? "📍 IP-based location loaded"
-          : "⚠️ Using default city (location unavailable)";
+          : "⚠️ Using default city";
       } catch(err) {
-        // On denial during boot, show modal
         if (err.code === 1) {
           const errorInfo = getGeolocationErrorMessage(err.code, err.message);
-          els.status.textContent = "⚠️ Location permission needed for accurate weather";
+          els.status.textContent = "⚠️ Location permission needed";
           showLocationModal(errorInfo.title, errorInfo.message);
-          // Proceed with IP fallback after short delay
           setTimeout(async () => {
             const ipLoc = await getIPLocation();
             lastGeo = { lat: ipLoc.lat, lon: ipLoc.lon, label: ipLoc.label };
@@ -765,7 +760,6 @@
             els.status.textContent = ipLoc.from === "ip" ? "📍 IP-based location loaded" : "⚠️ Using default city";
           }, 1000);
         } else {
-          // For other errors, fallback to IP
           const errorInfo = getGeolocationErrorMessage(err.code || 0, err.message || "Unknown error");
           toast(errorInfo.message);
           const ipLoc = await getIPLocation();
@@ -780,15 +774,9 @@
       if (lastCity) els.city.placeholder = `Try: ${lastCity.name}`;
 
       const hr = new Date().getHours();
-      if (hr >= 6 && hr < 9) checkMorningGreeting(farcasterContext);
+      if (hr >= 6 && hr < 9) checkMorningGreeting();
 
-      // Signal to Farcaster that app is ready
-      try {
-        await sdk.actions.ready();
-        console.log("✅ Farcaster SDK ready");
-      } catch(err) {
-        console.log("Not in Farcaster context or SDK error:", err);
-      }
+      console.log("✅ Boot complete. SDK ready:", sdkReady);
     })();
   </script>
 </body>
