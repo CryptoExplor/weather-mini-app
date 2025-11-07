@@ -13,7 +13,8 @@
     "description": "Get live weather, daily forecasts, adaptive greetings, and morning notifications right inside Farcaster.",
     "primaryCategory": "utility",
     "tags": [
-      "weather"
+      "weather",
+      "castweather"
     ],
     "ogTitle": "Weather • Farcaster MiniApp"
   },
