@@ -195,21 +195,6 @@
     const GEO_CODE   = "https://geocoding-api.open-meteo.com/v1/search";
     const DEFAULT_CITY = { name:"Bangalore", latitude:12.9716, longitude:77.5946 };
 
-    // Check if we're running in Base App environment
-    const isBaseEnvironment = () => {
-      try {
-        // Check for Base App specific properties
-        return typeof window !== 'undefined' && 
-               (window.location.hostname.includes('base.org') || 
-                window.location.hostname.includes('base-app') ||
-                (window.parent && window.parent !== window && 
-                 (window.parent.location.hostname.includes('base') || window.parent.location.hostname.includes('tba'))));
-      } catch (e) {
-        // Cross-origin error means we're likely in an iframe (could be Base App)
-        return true;
-      }
-    };
-
     const WMO = {
       0:{t:"Clear sky",e:"☀️",bg:"sunny"}, 1:{t:"Mainly clear",e:"🌤️",bg:"sunny"}, 2:{t:"Partly cloudy",e:"⛅",bg:"cloudy"}, 3:{t:"Overcast",e:"☁️",bg:"cloudy"},
       45:{t:"Fog",e:"🌫️",bg:"cloudy"}, 48:{t:"Depositing rime fog",e:"🌫️",bg:"cloudy"},
@@ -533,12 +518,7 @@
       const cond = els.cond.textContent;
       const humid = els.humid.textContent;
       const wind = els.wind.textContent;
-      return `${emoji} Weather Update
-
-${temp} ${cond}
-💧 ${humid} humidity • 🍃 ${wind} wind
-
-via CastWeather MiniApp 🌤️`;
+      return `${emoji} Weather Update\n\n${temp} ${cond}\n💧 ${humid} humidity • 🍃 ${wind} wind\n\nvia CastWeather MiniApp 🌤️`;
     }
 
     // Global SDK state
@@ -548,12 +528,9 @@ via CastWeather MiniApp 🌤️`;
 
     // Cast weather with proper error handling
     async function castWeather(){
-      // Check if we're in a Base app environment
-      const inBaseApp = isBaseEnvironment();
-      
-      if (!sdkReady && !inBaseApp) {
-        toast("⚠️ Not running in compatible app");
-        console.log("SDK not ready and not in Base app, falling back to copy");
+      if (!sdkReady) {
+        toast("⚠️ Not running in Farcaster app");
+        console.log("SDK not ready, falling back to copy");
         copyWeather();
         return;
       }
@@ -563,52 +540,22 @@ via CastWeather MiniApp 🌤️`;
         els.btnCast.textContent = "Casting...";
         
         console.log("Attempting to compose cast...");
-        
-        // If in Base app environment, use fallback method that works in both environments
-        if (inBaseApp) {
-          // Create a temporary textarea to hold the text
-          const textToCopy = getWeatherText();
-          
-          // Try to use the Clipboard API first
-          if (navigator.clipboard) {
-            try {
-              await navigator.clipboard.writeText(textToCopy);
-              toast("📋 Weather copied! Now paste in the cast composer.");
-            } catch (clipboardErr) {
-              console.log("Clipboard API failed, using fallback", clipboardErr);
-              copy(textToCopy);
-            }
-          } else {
-            // Fallback to legacy copy method
-            copy(textToCopy);
-          }
-          
-          // Open the Base app composer if possible
-          try {
-            // Try to open Base app composer
-            window.open(`https://warpcast.com/~/compose?text=${encodeURIComponent(textToCopy)}&embeds[]=https://weather-base-app.vercel.app/`, '_blank');
-          } catch (openErr) {
-            console.log("Could not auto-open composer, user needs to paste manually");
+        const result = await sdk.actions.composeCast({
+          text: getWeatherText(),
+          embeds: ["https://weather-base-app.vercel.app/"]
+        });
+
+        console.log("Cast result:", result);
+
+        if (result?.cast) {
+          toast(`✅ Cast posted! Hash: ${result.cast.hash.slice(0,10)}...`);
+          console.log("Cast hash:", result.cast.hash);
+          if (result.cast.channelKey) {
+            console.log("Posted to channel:", result.cast.channelKey);
           }
         } else {
-          // Use Farcaster SDK for Farcaster app
-          const result = await sdk.actions.composeCast({
-            text: getWeatherText(),
-            embeds: ["https://weather-base-app.vercel.app/"]
-          });
-
-          console.log("Cast result:", result);
-
-          if (result?.cast) {
-            toast(`✅ Cast posted! Hash: ${result.cast.hash.slice(0,10)}...`);
-            console.log("Cast hash:", result.cast.hash);
-            if (result.cast.channelKey) {
-              console.log("Posted to channel:", result.cast.channelKey);
-            }
-          } else {
-            toast("Cast cancelled or failed");
-            console.log("Cast was cancelled or returned no result");
-          }
+          toast("Cast cancelled or failed");
+          console.log("Cast was cancelled or returned no result");
         }
       } catch(err) {
         console.error("Cast error:", err);
@@ -676,40 +623,16 @@ via CastWeather MiniApp 🌤️`;
           els.btnCast.disabled = false;
           els.btnAddMiniapp.disabled = false;
         } else {
-          // Check if we're in Base app environment where SDK might not be available
-          const inBaseApp = isBaseEnvironment();
-          if (inBaseApp) {
-            console.log("Running in Base app environment");
-            // In Base app, we can still function but with limited SDK features
-            sdkReady = true;
-            els.btnCast.disabled = false;
-            els.btnAddMiniapp.disabled = false;
-            els.btnCast.title = "Cast weather to Base";
-            els.btnAddMiniapp.title = "Add to Base app";
-          } else {
-            console.log("No user context found and not in Base app");
-            sdkReady = false;
-            els.btnCast.title = "Only available in Farcaster app";
-            els.btnAddMiniapp.title = "Only available in Farcaster app";
-          }
-        }
-      } catch(err) {
-        console.log("Not running in Farcaster context:", err);
-        // Check if we're in Base app environment where SDK might not be available
-        const inBaseApp = isBaseEnvironment();
-        if (inBaseApp) {
-          console.log("Running in Base app environment despite SDK error");
-          // In Base app, we can still function but with limited SDK features
-          sdkReady = true;
-          els.btnCast.disabled = false;
-          els.btnAddMiniapp.disabled = false;
-          els.btnCast.title = "Cast weather to Base";
-          els.btnAddMiniapp.title = "Add to Base app";
-        } else {
+          console.log("No user context found");
           sdkReady = false;
           els.btnCast.title = "Only available in Farcaster app";
           els.btnAddMiniapp.title = "Only available in Farcaster app";
         }
+      } catch(err) {
+        console.log("Not running in Farcaster context:", err);
+        sdkReady = false;
+        els.btnCast.title = "Only available in Farcaster app";
+        els.btnAddMiniapp.title = "Only available in Farcaster app";
       }
     }
 
