@@ -5,20 +5,5 @@
       "destination": "https://api.farcaster.xyz/miniapps/hosted-manifest/0199e94c-54a0-cdeb-0f02-450da57739da",
       "permanent": false
     }
-  ],
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "crons": [
-    {
-      "path": "/api/send-notification",
-      "schedule": "0 5 * * *"
-    }
-  ],
-  "outputDirectory": ".",
-  "buildCommand": "npm run build",
-  "devCommand": "npm run dev",
-  "installCommand": "npm install",
-  "framework": "vite"
+  ]
 }
