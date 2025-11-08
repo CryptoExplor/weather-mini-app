@@ -16,7 +16,7 @@
       "schedule": "0 5 * * *"
     }
   ],
-  "outputDirectory": "dist",
+  "outputDirectory": ".",
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
