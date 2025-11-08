@@ -5,5 +5,15 @@
       "destination": "https://api.farcaster.xyz/miniapps/hosted-manifest/0199e94c-54a0-cdeb-0f02-450da57739da",
       "permanent": false
     }
-  ]
+  ],
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" }
+  ],
+  "crons": [
+    {
+      "path": "/api/send-notification",
+      "schedule": "0 5 * * *"
+    }
+  ],
+  "outputDirectory": "."
 }
