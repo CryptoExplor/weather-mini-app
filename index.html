@@ -542,7 +542,7 @@
         console.log("Attempting to compose cast...");
         const result = await sdk.actions.composeCast({
           text: getWeatherText(),
-          embeds: ["https://weather-base-app.vercel.app/"]
+          embeds: ["weather-base-app.vercel.app"]
         });
 
         console.log("Cast result:", result);
